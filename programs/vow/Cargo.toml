@@ -1,0 +1,19 @@
+[package]
+name = "vow"
+version = "0.1.0"
+edition = "2021"
+description = "VOW Protocol — Soulbound identity, session keys, and stake-backed credentials on X1 Network"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "vow"
+
+[features]
+no-entrypoint = []
+cpi = ["no-entrypoint"]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+default = []
+
+[dependencies]
+anchor-lang = { version = "=0.31.0", features = ["init-if-needed"] }
+anchor-spl = { version = "=0.31.0" }

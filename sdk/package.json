@@ -1,0 +1,20 @@
+{
+  "name": "@x1/xnft-sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for the xNFT Protocol on X1 Network",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "@coral-xyz/anchor": "^0.31.0",
+    "@solana/web3.js": "^1.95"
+  },
+  "devDependencies": {
+    "@coral-xyz/anchor": "^0.31.0",
+    "@solana/web3.js": "^1.95",
+    "typescript": "^5.3.3"
+  }
+}

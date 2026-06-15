@@ -1,0 +1,4766 @@
+{
+  "address": "5VfCTcYpeG8ycZasHRdkXq4q8JPGAnmHHhvpK3mbEPwV",
+  "metadata": {
+    "name": "xnft",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "xNFT Protocol — XIP-0001: Transferable proof-of-commitment on X1 Network"
+  },
+  "instructions": [
+    {
+      "name": "add_validator",
+      "discriminator": [
+        250,
+        113,
+        53,
+        54,
+        141,
+        117,
+        215,
+        185
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator_entry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "vote_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool_stake",
+          "docs": [
+            "Pool stake account PDA — lamport-only; funded and delegated separately"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "vote_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vote_account_info"
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "vote_account",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "begin_redeem",
+      "discriminator": [
+        105,
+        132,
+        194,
+        143,
+        173,
+        148,
+        233,
+        36
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "xnft_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  120,
+                  110,
+                  102,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "xnft_state.asset_id",
+                "account": "XNftState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "redeem_escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  100,
+                  101,
+                  101,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "xnft_state"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "xnft_state"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "block_app",
+      "discriminator": [
+        192,
+        82,
+        175,
+        217,
+        236,
+        13,
+        65,
+        104
+      ],
+      "accounts": [
+        {
+          "name": "app_registry",
+          "writable": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_authority_profile",
+      "discriminator": [
+        56,
+        241,
+        221,
+        157,
+        211,
+        240,
+        14,
+        232
+      ],
+      "accounts": [
+        {
+          "name": "authority_profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121,
+                  95,
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              },
+              {
+                "kind": "account",
+                "path": "authority_profile.profile_id",
+                "account": "AuthorityProfile"
+              }
+            ]
+          }
+        },
+        {
+          "name": "wallet",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "authority_profile"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_session",
+      "discriminator": [
+        68,
+        114,
+        178,
+        140,
+        222,
+        38,
+        248,
+        211
+      ],
+      "accounts": [
+        {
+          "name": "xnft_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  120,
+                  110,
+                  102,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "xnft_state.asset_id",
+                "account": "XNftState"
+              }
+            ]
+          },
+          "relations": [
+            "session_account"
+          ]
+        },
+        {
+          "name": "session_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "xnft_state"
+              },
+              {
+                "kind": "account",
+                "path": "session_account.session_key",
+                "account": "SessionAccount"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "xnft_state"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "complete_redeem",
+      "discriminator": [
+        234,
+        40,
+        26,
+        254,
+        202,
+        90,
+        42,
+        209
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "xnft_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  120,
+                  110,
+                  102,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "xnft_state.asset_id",
+                "account": "XNftState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "redeem_escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  100,
+                  101,
+                  101,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "xnft_state"
+              }
+            ]
+          }
+        },
+        {
+          "name": "reserve",
+          "docs": [
+            "Reserve PDA — source of redemption lamports"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  115,
+                  101,
+                  114,
+                  118,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "xnft_state",
+            "redeem_escrow"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "clock",
+          "address": "SysvarC1ock11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_authority_profile",
+      "discriminator": [
+        144,
+        41,
+        68,
+        69,
+        166,
+        81,
+        49,
+        175
+      ],
+      "accounts": [
+        {
+          "name": "authority_profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121,
+                  95,
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              },
+              {
+                "kind": "arg",
+                "path": "profile_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "wallet",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "profile_id",
+          "type": {
+            "array": [
+              "u8",
+              8
+            ]
+          }
+        },
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "AuthorityProfileParams"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "create_session",
+      "discriminator": [
+        242,
+        193,
+        143,
+        179,
+        150,
+        25,
+        122,
+        227
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "xnft_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  120,
+                  110,
+                  102,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "xnft_state.asset_id",
+                "account": "XNftState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "session_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "xnft_state"
+              },
+              {
+                "kind": "arg",
+                "path": "session_key"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority_profile",
+          "docs": [
+            "Optional authority profile to inherit defaults from.",
+            "Pass the system program as a dummy if not using a profile."
+          ],
+          "optional": true
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "xnft_state"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "session_key",
+          "type": "pubkey"
+        },
+        {
+          "name": "allowed_program_ids",
+          "type": {
+            "vec": "pubkey"
+          }
+        },
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "SessionParams"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "deactivate_pool_stake",
+      "discriminator": [
+        244,
+        247,
+        41,
+        166,
+        88,
+        56,
+        195,
+        56
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator_entry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "validator_entry.vote_account",
+                "account": "ValidatorEntry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool_stake",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "validator_entry.vote_account",
+                "account": "ValidatorEntry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "clock",
+          "address": "SysvarC1ock11111111111111111111111111111111"
+        },
+        {
+          "name": "stake_program",
+          "address": "Stake11111111111111111111111111111111111111"
+        },
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "delegate_pool_stake",
+      "discriminator": [
+        197,
+        64,
+        172,
+        174,
+        14,
+        172,
+        204,
+        207
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator_entry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "validator_entry.vote_account",
+                "account": "ValidatorEntry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool_stake",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "validator_entry.vote_account",
+                "account": "ValidatorEntry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vote_account_info"
+        },
+        {
+          "name": "clock",
+          "address": "SysvarC1ock11111111111111111111111111111111"
+        },
+        {
+          "name": "stake_history",
+          "address": "SysvarStakeHistory1111111111111111111111111"
+        },
+        {
+          "name": "stake_program",
+          "address": "Stake11111111111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "flush_reserve_to_pool",
+      "discriminator": [
+        103,
+        202,
+        110,
+        26,
+        132,
+        24,
+        248,
+        248
+      ],
+      "accounts": [
+        {
+          "name": "stake_pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator_entry",
+          "docs": [
+            "Registered validator entry — constrains which pool_stake is valid"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "validator_entry.vote_account",
+                "account": "ValidatorEntry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "reserve",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  115,
+                  101,
+                  114,
+                  118,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool_stake",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "validator_entry.vote_account",
+                "account": "ValidatorEntry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "harvest",
+      "discriminator": [
+        228,
+        241,
+        31,
+        182,
+        53,
+        169,
+        59,
+        199
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "xnft_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  120,
+                  110,
+                  102,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "xnft_state.asset_id",
+                "account": "XNftState"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "reserve",
+          "docs": [
+            "Reserve PDA — lamport-only; receives SOL from mints, no data stored"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  115,
+                  101,
+                  114,
+                  118,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "weights",
+          "type": {
+            "defined": {
+              "name": "ScoringWeights"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialize_pool_stake",
+      "discriminator": [
+        32,
+        30,
+        163,
+        44,
+        201,
+        173,
+        205,
+        208
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator_entry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "validator_entry.vote_account",
+                "account": "ValidatorEntry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool_stake",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "validator_entry.vote_account",
+                "account": "ValidatorEntry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "stake_program",
+          "address": "Stake11111111111111111111111111111111111111"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "mint_xnft",
+      "discriminator": [
+        167,
+        202,
+        255,
+        35,
+        32,
+        128,
+        202,
+        150
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "asset_id_account",
+          "docs": [
+            "asset_id PDA — derived from [b\"xnft_asset\", nonce.to_le_bytes()]"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  120,
+                  110,
+                  102,
+                  116,
+                  95,
+                  97,
+                  115,
+                  115,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "config.total_minted",
+                "account": "ProtocolConfig"
+              }
+            ]
+          }
+        },
+        {
+          "name": "xnft_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  120,
+                  110,
+                  102,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "asset_id_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "reserve",
+          "docs": [
+            "Reserve PDA — receives the staked lamports"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  115,
+                  101,
+                  114,
+                  118,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "stake_lamports",
+          "type": "u64"
+        },
+        {
+          "name": "yield_mode",
+          "type": {
+            "defined": {
+              "name": "YieldMode"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "pause_protocol",
+      "discriminator": [
+        144,
+        95,
+        0,
+        107,
+        119,
+        39,
+        248,
+        141
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "rebalance_pool",
+      "discriminator": [
+        51,
+        166,
+        130,
+        88,
+        225,
+        7,
+        165,
+        16
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "clock",
+          "address": "SysvarC1ock11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "record_commitment",
+      "discriminator": [
+        73,
+        240,
+        201,
+        91,
+        242,
+        96,
+        145,
+        38
+      ],
+      "accounts": [
+        {
+          "name": "commitment_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "xnft_state.owner",
+                "account": "XNftState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "xnft_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  120,
+                  110,
+                  102,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "xnft_state.asset_id",
+                "account": "XNftState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "record_fulfillment",
+      "discriminator": [
+        30,
+        160,
+        36,
+        242,
+        114,
+        71,
+        120,
+        2
+      ],
+      "accounts": [
+        {
+          "name": "commitment_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "xnft_state.owner",
+                "account": "XNftState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "xnft_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  120,
+                  110,
+                  102,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "xnft_state.asset_id",
+                "account": "XNftState"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "register_app",
+      "discriminator": [
+        5,
+        248,
+        20,
+        126,
+        12,
+        159,
+        9,
+        242
+      ],
+      "accounts": [
+        {
+          "name": "app_registry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  112,
+                  112
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "program_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "program_id",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "remove_validator",
+      "discriminator": [
+        25,
+        96,
+        211,
+        155,
+        161,
+        14,
+        168,
+        188
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator_entry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "validator_entry.vote_account",
+                "account": "ValidatorEntry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "resume_protocol",
+      "discriminator": [
+        62,
+        91,
+        76,
+        18,
+        174,
+        87,
+        87,
+        208
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "revoke_session",
+      "discriminator": [
+        86,
+        92,
+        198,
+        120,
+        144,
+        2,
+        7,
+        194
+      ],
+      "accounts": [
+        {
+          "name": "xnft_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  120,
+                  110,
+                  102,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "xnft_state.asset_id",
+                "account": "XNftState"
+              }
+            ]
+          },
+          "relations": [
+            "session_account"
+          ]
+        },
+        {
+          "name": "session_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "xnft_state"
+              },
+              {
+                "kind": "account",
+                "path": "session_account.session_key",
+                "account": "SessionAccount"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "xnft_state"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "score_validator",
+      "discriminator": [
+        71,
+        56,
+        95,
+        206,
+        190,
+        239,
+        156,
+        92
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator_entry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "validator_entry.vote_account",
+                "account": "ValidatorEntry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vote_account_info"
+        }
+      ],
+      "args": [
+        {
+          "name": "avg_credits_per_epoch",
+          "type": "u64"
+        },
+        {
+          "name": "active_epoch_count",
+          "type": "u8"
+        },
+        {
+          "name": "commission",
+          "type": "u8"
+        },
+        {
+          "name": "self_stake_lamports",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "set_admin",
+      "discriminator": [
+        251,
+        163,
+        0,
+        52,
+        91,
+        194,
+        187,
+        92
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "new_admin"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "transfer_xnft",
+      "discriminator": [
+        111,
+        155,
+        149,
+        202,
+        114,
+        184,
+        225,
+        170
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "xnft_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  120,
+                  110,
+                  102,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "xnft_state.asset_id",
+                "account": "XNftState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "new_owner"
+        },
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "xnft_state"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "update_authority_profile",
+      "discriminator": [
+        128,
+        41,
+        71,
+        135,
+        101,
+        218,
+        1,
+        140
+      ],
+      "accounts": [
+        {
+          "name": "authority_profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121,
+                  95,
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              },
+              {
+                "kind": "account",
+                "path": "authority_profile.profile_id",
+                "account": "AuthorityProfile"
+              }
+            ]
+          }
+        },
+        {
+          "name": "wallet",
+          "signer": true,
+          "relations": [
+            "authority_profile"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "AuthorityProfileParams"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_scoring_weights",
+      "discriminator": [
+        211,
+        128,
+        188,
+        229,
+        1,
+        203,
+        41,
+        227
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "credits_weight",
+          "type": "u32"
+        },
+        {
+          "name": "self_stake_weight",
+          "type": "u32"
+        },
+        {
+          "name": "self_stake_ceil",
+          "type": "u64"
+        },
+        {
+          "name": "skip_penalty",
+          "type": "u32"
+        },
+        {
+          "name": "commission_penalty",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "update_share_price",
+      "discriminator": [
+        187,
+        82,
+        214,
+        110,
+        19,
+        147,
+        149,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "update_yield_mode",
+      "discriminator": [
+        151,
+        81,
+        201,
+        162,
+        184,
+        80,
+        204,
+        133
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "xnft_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  120,
+                  110,
+                  102,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "xnft_state.asset_id",
+                "account": "XNftState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "xnft_state"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "new_mode",
+          "type": {
+            "defined": {
+              "name": "YieldMode"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "verify_app",
+      "discriminator": [
+        96,
+        168,
+        52,
+        166,
+        191,
+        211,
+        101,
+        23
+      ],
+      "accounts": [
+        {
+          "name": "app_registry",
+          "writable": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "withdraw_stake_to_reserve",
+      "discriminator": [
+        50,
+        199,
+        238,
+        2,
+        108,
+        71,
+        147,
+        158
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator_entry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "validator_entry.vote_account",
+                "account": "ValidatorEntry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool_stake",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "validator_entry.vote_account",
+                "account": "ValidatorEntry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "reserve",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  115,
+                  101,
+                  114,
+                  118,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "clock",
+          "address": "SysvarC1ock11111111111111111111111111111111"
+        },
+        {
+          "name": "stake_history",
+          "address": "SysvarStakeHistory1111111111111111111111111"
+        },
+        {
+          "name": "stake_program",
+          "address": "Stake11111111111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "withdraw_yield",
+      "discriminator": [
+        62,
+        9,
+        132,
+        32,
+        96,
+        57,
+        101,
+        82
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "xnft_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  120,
+                  110,
+                  102,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "xnft_state.asset_id",
+                "account": "XNftState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "reserve",
+          "docs": [
+            "Reserve PDA — source of yield lamports"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  115,
+                  101,
+                  114,
+                  118,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "xnft_state"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": {
+            "option": "u64"
+          }
+        }
+      ]
+    },
+    {
+      "name": "yield_spend",
+      "discriminator": [
+        192,
+        179,
+        130,
+        131,
+        203,
+        1,
+        200,
+        148
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "xnft_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  120,
+                  110,
+                  102,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "xnft_state.asset_id",
+                "account": "XNftState"
+              }
+            ]
+          },
+          "relations": [
+            "session_account"
+          ]
+        },
+        {
+          "name": "session_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "xnft_state"
+              },
+              {
+                "kind": "account",
+                "path": "session_account.session_key",
+                "account": "SessionAccount"
+              }
+            ]
+          }
+        },
+        {
+          "name": "calling_program",
+          "docs": [
+            "The calling application's program account — must be in allowed_program_ids and be executable."
+          ]
+        },
+        {
+          "name": "app_registry",
+          "docs": [
+            "Optional: app registry entry — checked for blocked status if provided"
+          ],
+          "optional": true
+        },
+        {
+          "name": "reserve",
+          "docs": [
+            "Reserve PDA — source of yield lamports"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  115,
+                  101,
+                  114,
+                  118,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "destination",
+          "docs": [
+            "Destination for the yield payment"
+          ],
+          "writable": true
+        },
+        {
+          "name": "session_signer",
+          "docs": [
+            "The ephemeral session key must sign this transaction"
+          ],
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "AppRegistry",
+      "discriminator": [
+        199,
+        158,
+        94,
+        103,
+        136,
+        111,
+        87,
+        65
+      ]
+    },
+    {
+      "name": "AuthorityProfile",
+      "discriminator": [
+        123,
+        172,
+        66,
+        188,
+        112,
+        144,
+        46,
+        220
+      ]
+    },
+    {
+      "name": "CommitmentRecord",
+      "discriminator": [
+        216,
+        195,
+        138,
+        99,
+        88,
+        191,
+        32,
+        246
+      ]
+    },
+    {
+      "name": "ProtocolConfig",
+      "discriminator": [
+        207,
+        91,
+        250,
+        28,
+        152,
+        179,
+        215,
+        209
+      ]
+    },
+    {
+      "name": "RedeemEscrow",
+      "discriminator": [
+        25,
+        26,
+        150,
+        138,
+        219,
+        251,
+        76,
+        26
+      ]
+    },
+    {
+      "name": "SessionAccount",
+      "discriminator": [
+        74,
+        34,
+        65,
+        133,
+        96,
+        163,
+        80,
+        69
+      ]
+    },
+    {
+      "name": "StakePool",
+      "discriminator": [
+        121,
+        34,
+        206,
+        21,
+        79,
+        127,
+        255,
+        28
+      ]
+    },
+    {
+      "name": "ValidatorEntry",
+      "discriminator": [
+        174,
+        87,
+        76,
+        168,
+        228,
+        42,
+        70,
+        4
+      ]
+    },
+    {
+      "name": "XNftState",
+      "discriminator": [
+        221,
+        18,
+        51,
+        83,
+        72,
+        57,
+        38,
+        143
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "AppBlocked",
+      "discriminator": [
+        75,
+        126,
+        24,
+        116,
+        36,
+        210,
+        19,
+        48
+      ]
+    },
+    {
+      "name": "AppRegistered",
+      "discriminator": [
+        99,
+        12,
+        19,
+        34,
+        85,
+        60,
+        170,
+        229
+      ]
+    },
+    {
+      "name": "Harvested",
+      "discriminator": [
+        249,
+        229,
+        78,
+        151,
+        106,
+        185,
+        149,
+        11
+      ]
+    },
+    {
+      "name": "PoolRebalanced",
+      "discriminator": [
+        75,
+        223,
+        62,
+        177,
+        222,
+        42,
+        34,
+        141
+      ]
+    },
+    {
+      "name": "ProtocolInitialized",
+      "discriminator": [
+        173,
+        122,
+        168,
+        254,
+        9,
+        118,
+        76,
+        132
+      ]
+    },
+    {
+      "name": "RebalanceTargetsSet",
+      "discriminator": [
+        18,
+        161,
+        62,
+        103,
+        66,
+        203,
+        18,
+        216
+      ]
+    },
+    {
+      "name": "SessionCreated",
+      "discriminator": [
+        107,
+        111,
+        254,
+        25,
+        21,
+        122,
+        220,
+        225
+      ]
+    },
+    {
+      "name": "SessionRevoked",
+      "discriminator": [
+        90,
+        48,
+        35,
+        234,
+        203,
+        192,
+        126,
+        211
+      ]
+    },
+    {
+      "name": "SharePriceUpdated",
+      "discriminator": [
+        87,
+        183,
+        68,
+        144,
+        145,
+        36,
+        213,
+        4
+      ]
+    },
+    {
+      "name": "StakeDeactivated",
+      "discriminator": [
+        202,
+        88,
+        80,
+        236,
+        248,
+        129,
+        102,
+        236
+      ]
+    },
+    {
+      "name": "StakeDelegated",
+      "discriminator": [
+        126,
+        201,
+        132,
+        208,
+        255,
+        188,
+        95,
+        225
+      ]
+    },
+    {
+      "name": "StakeInitialized",
+      "discriminator": [
+        148,
+        201,
+        109,
+        225,
+        10,
+        33,
+        117,
+        163
+      ]
+    },
+    {
+      "name": "StakeWithdrawn",
+      "discriminator": [
+        33,
+        120,
+        159,
+        58,
+        140,
+        255,
+        174,
+        79
+      ]
+    },
+    {
+      "name": "ValidatorAdded",
+      "discriminator": [
+        67,
+        26,
+        43,
+        25,
+        58,
+        219,
+        99,
+        48
+      ]
+    },
+    {
+      "name": "ValidatorScored",
+      "discriminator": [
+        70,
+        141,
+        83,
+        173,
+        171,
+        231,
+        79,
+        198
+      ]
+    },
+    {
+      "name": "XNftMatured",
+      "discriminator": [
+        168,
+        99,
+        85,
+        43,
+        104,
+        156,
+        143,
+        112
+      ]
+    },
+    {
+      "name": "XNftMinted",
+      "discriminator": [
+        254,
+        139,
+        159,
+        211,
+        95,
+        219,
+        201,
+        97
+      ]
+    },
+    {
+      "name": "XNftRedeemBegun",
+      "discriminator": [
+        71,
+        130,
+        126,
+        54,
+        17,
+        107,
+        184,
+        33
+      ]
+    },
+    {
+      "name": "XNftRedeemed",
+      "discriminator": [
+        86,
+        67,
+        190,
+        231,
+        8,
+        138,
+        99,
+        173
+      ]
+    },
+    {
+      "name": "XNftTransferred",
+      "discriminator": [
+        253,
+        38,
+        93,
+        9,
+        173,
+        132,
+        158,
+        131
+      ]
+    },
+    {
+      "name": "YieldModeUpdated",
+      "discriminator": [
+        98,
+        192,
+        69,
+        114,
+        18,
+        158,
+        217,
+        61
+      ]
+    },
+    {
+      "name": "YieldSpent",
+      "discriminator": [
+        11,
+        184,
+        14,
+        135,
+        55,
+        241,
+        255,
+        105
+      ]
+    },
+    {
+      "name": "YieldWithdrawn",
+      "discriminator": [
+        175,
+        101,
+        144,
+        232,
+        244,
+        176,
+        99,
+        108
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "ProtocolPaused",
+      "msg": "Protocol is paused"
+    },
+    {
+      "code": 6001,
+      "name": "InsufficientStake",
+      "msg": "Insufficient stake amount for any class"
+    },
+    {
+      "code": 6002,
+      "name": "StakeOverflow",
+      "msg": "Stake amount exceeds maximum"
+    },
+    {
+      "code": 6003,
+      "name": "NotMatured",
+      "msg": "xNFT has not yet matured"
+    },
+    {
+      "code": 6004,
+      "name": "AlreadyMatured",
+      "msg": "xNFT is already matured"
+    },
+    {
+      "code": 6005,
+      "name": "AlreadyRedeeming",
+      "msg": "xNFT is already in redeem state"
+    },
+    {
+      "code": 6006,
+      "name": "NotRedeeming",
+      "msg": "xNFT is not in redeem state"
+    },
+    {
+      "code": 6007,
+      "name": "InvalidAssetId",
+      "msg": "Invalid asset ID for this Merkle tree and nonce"
+    },
+    {
+      "code": 6008,
+      "name": "InvalidOwner",
+      "msg": "Invalid owner — xNFT owner mismatch"
+    },
+    {
+      "code": 6009,
+      "name": "SessionExpired",
+      "msg": "Session is expired"
+    },
+    {
+      "code": 6010,
+      "name": "SessionInactive",
+      "msg": "Session is not active"
+    },
+    {
+      "code": 6011,
+      "name": "SessionInvalidated",
+      "msg": "Session was invalidated by a transfer"
+    },
+    {
+      "code": 6012,
+      "name": "ProgramNotAllowed",
+      "msg": "Calling program is not in session's allowed_program_ids"
+    },
+    {
+      "code": 6013,
+      "name": "DailyLimitExceeded",
+      "msg": "Daily spend limit exceeded"
+    },
+    {
+      "code": 6014,
+      "name": "LifetimeLimitExceeded",
+      "msg": "Lifetime spend limit exceeded"
+    },
+    {
+      "code": 6015,
+      "name": "VelocityLimitExceeded",
+      "msg": "Transaction velocity limit exceeded"
+    },
+    {
+      "code": 6016,
+      "name": "InsufficientYieldBalance",
+      "msg": "Insufficient yield balance"
+    },
+    {
+      "code": 6017,
+      "name": "AppBlocked",
+      "msg": "Application is blocked"
+    },
+    {
+      "code": 6018,
+      "name": "ValidatorAlreadyExists",
+      "msg": "Validator is already registered"
+    },
+    {
+      "code": 6019,
+      "name": "ValidatorNotFound",
+      "msg": "Validator not found"
+    },
+    {
+      "code": 6020,
+      "name": "MaxValidatorsReached",
+      "msg": "Maximum validator count reached"
+    },
+    {
+      "code": 6021,
+      "name": "NoActiveValidators",
+      "msg": "Pool has no active validators"
+    },
+    {
+      "code": 6022,
+      "name": "SharePriceOverflow",
+      "msg": "Share price computation overflow"
+    },
+    {
+      "code": 6023,
+      "name": "SharesUnderflow",
+      "msg": "Shares underflow — insufficient shares to burn"
+    },
+    {
+      "code": 6024,
+      "name": "NoRewards",
+      "msg": "No rewards available to harvest"
+    },
+    {
+      "code": 6025,
+      "name": "YieldModeUnchanged",
+      "msg": "Yield mode is unchanged"
+    },
+    {
+      "code": 6026,
+      "name": "ProfileNotFound",
+      "msg": "Authority profile not found"
+    },
+    {
+      "code": 6027,
+      "name": "ProfileIdTaken",
+      "msg": "Authority profile ID already in use"
+    },
+    {
+      "code": 6028,
+      "name": "TooManyProgramIds",
+      "msg": "Maximum allowed program IDs per session exceeded"
+    },
+    {
+      "code": 6029,
+      "name": "ValidatorInactive",
+      "msg": "Validator is inactive"
+    },
+    {
+      "code": 6030,
+      "name": "InvalidVoteAccount",
+      "msg": "Invalid vote account data"
+    },
+    {
+      "code": 6031,
+      "name": "InvalidStakeAccount",
+      "msg": "Invalid stake account data"
+    },
+    {
+      "code": 6032,
+      "name": "Unauthorized",
+      "msg": "Unauthorized — admin only"
+    },
+    {
+      "code": 6033,
+      "name": "MathOverflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6034,
+      "name": "StakeNotDeactivated",
+      "msg": "Stake deactivation not yet complete"
+    },
+    {
+      "code": 6035,
+      "name": "EmptyReserve",
+      "msg": "Reserve is empty"
+    },
+    {
+      "code": 6036,
+      "name": "RebalanceTooSoon",
+      "msg": "Rebalance already performed this epoch"
+    },
+    {
+      "code": 6037,
+      "name": "TreeCapacityExhausted",
+      "msg": "Merkle tree capacity exhausted"
+    },
+    {
+      "code": 6038,
+      "name": "StakeAlreadyInitialized",
+      "msg": "Pool stake account is already initialized as a Solana stake account"
+    },
+    {
+      "code": 6039,
+      "name": "StakeNotInitialized",
+      "msg": "Pool stake account has not been initialized yet — call initialize_pool_stake first"
+    },
+    {
+      "code": 6040,
+      "name": "StakeAlreadyDelegated",
+      "msg": "Pool stake account is already delegated"
+    },
+    {
+      "code": 6041,
+      "name": "StakeNotDelegated",
+      "msg": "Pool stake account is not delegated"
+    },
+    {
+      "code": 6042,
+      "name": "StakeStillActive",
+      "msg": "Pool stake account still has active delegation — deactivate first"
+    },
+    {
+      "code": 6043,
+      "name": "InsufficientStakeFunds",
+      "msg": "Pool stake account has insufficient lamports to cover rent and minimum delegation"
+    },
+    {
+      "code": 6044,
+      "name": "InvalidAccountPairs",
+      "msg": "Remaining accounts must be alternating (ValidatorEntry, PoolStake) pairs"
+    },
+    {
+      "code": 6045,
+      "name": "StakeAccountMismatch",
+      "msg": "Pool stake account does not match the validator entry's registered stake account"
+    },
+    {
+      "code": 6046,
+      "name": "InvalidValidatorEntry",
+      "msg": "Validator entry account is not owned by this program"
+    }
+  ],
+  "types": [
+    {
+      "name": "AppBlocked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "program_id",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AppRegistered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "program_id",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AppRegistry",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "program_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "verified",
+            "type": "bool"
+          },
+          {
+            "name": "blocked",
+            "type": "bool"
+          },
+          {
+            "name": "registered_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AuthorityProfile",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "profile_id",
+            "type": {
+              "array": [
+                "u8",
+                8
+              ]
+            }
+          },
+          {
+            "name": "default_daily_limit",
+            "type": "u64"
+          },
+          {
+            "name": "default_lifetime_limit",
+            "type": "u64"
+          },
+          {
+            "name": "default_expiry_days",
+            "type": "u32"
+          },
+          {
+            "name": "default_allowed_program_ids",
+            "type": {
+              "array": [
+                "pubkey",
+                8
+              ]
+            }
+          },
+          {
+            "name": "program_count",
+            "type": "u8"
+          },
+          {
+            "name": "metadata_uri",
+            "type": {
+              "array": [
+                "u8",
+                128
+              ]
+            }
+          },
+          {
+            "name": "uri_len",
+            "type": "u8"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AuthorityProfileParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "default_daily_limit",
+            "type": "u64"
+          },
+          {
+            "name": "default_lifetime_limit",
+            "type": "u64"
+          },
+          {
+            "name": "default_expiry_days",
+            "type": "u32"
+          },
+          {
+            "name": "default_allowed_program_ids",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "metadata_uri",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CommitmentRecord",
+      "docs": [
+        "V2 — commitment reputation, non-transferable, wallet-bound.",
+        "Tracks historical commitment as a pure reputation metric."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_xnfts_minted",
+            "type": "u32"
+          },
+          {
+            "name": "total_xnt_committed",
+            "type": "u64"
+          },
+          {
+            "name": "total_xnt_fulfilled",
+            "type": "u64"
+          },
+          {
+            "name": "highest_class_ever",
+            "type": "u8"
+          },
+          {
+            "name": "total_commitment_days",
+            "type": "u64"
+          },
+          {
+            "name": "commitment_score",
+            "type": "u32"
+          },
+          {
+            "name": "last_updated",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Harvested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "gain",
+            "type": "i64"
+          },
+          {
+            "name": "yield_credited",
+            "type": "u64"
+          },
+          {
+            "name": "shares_burned",
+            "type": "u128"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PoolRebalanced",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "validator_count",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProtocolConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "current_share_price",
+            "type": "u128"
+          },
+          {
+            "name": "total_shares",
+            "type": "u128"
+          },
+          {
+            "name": "total_yield_claims",
+            "type": "u64"
+          },
+          {
+            "name": "last_pool_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "total_minted",
+            "type": "u64"
+          },
+          {
+            "name": "merkle_tree",
+            "type": "pubkey"
+          },
+          {
+            "name": "credits_weight",
+            "type": "u32"
+          },
+          {
+            "name": "self_stake_weight",
+            "type": "u32"
+          },
+          {
+            "name": "self_stake_ceil",
+            "type": "u64"
+          },
+          {
+            "name": "skip_penalty",
+            "type": "u32"
+          },
+          {
+            "name": "commission_penalty",
+            "type": "u32"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProtocolInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "merkle_tree",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RebalanceTargetsSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "validator_count",
+            "type": "u8"
+          },
+          {
+            "name": "total_pool_lamports",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RedeemEscrow",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "xnft_state",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "lamports_owed",
+            "type": "u64"
+          },
+          {
+            "name": "deactivation_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ScoringWeights",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "credits_weight",
+            "type": "u32"
+          },
+          {
+            "name": "self_stake_weight",
+            "type": "u32"
+          },
+          {
+            "name": "self_stake_ceil",
+            "type": "u64"
+          },
+          {
+            "name": "skip_penalty",
+            "type": "u32"
+          },
+          {
+            "name": "commission_penalty",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SessionAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "xnft_state",
+            "type": "pubkey"
+          },
+          {
+            "name": "session_key",
+            "type": "pubkey"
+          },
+          {
+            "name": "allowed_program_ids",
+            "type": {
+              "array": [
+                "pubkey",
+                8
+              ]
+            }
+          },
+          {
+            "name": "program_count",
+            "type": "u8"
+          },
+          {
+            "name": "start_ts",
+            "type": "i64"
+          },
+          {
+            "name": "expiry_ts",
+            "type": "i64"
+          },
+          {
+            "name": "daily_limit",
+            "type": "u64"
+          },
+          {
+            "name": "lifetime_limit",
+            "type": "u64"
+          },
+          {
+            "name": "velocity_limit",
+            "type": "u32"
+          },
+          {
+            "name": "spent_today",
+            "type": "u64"
+          },
+          {
+            "name": "spent_total",
+            "type": "u64"
+          },
+          {
+            "name": "tx_count_today",
+            "type": "u32"
+          },
+          {
+            "name": "last_reset_day",
+            "type": "i64"
+          },
+          {
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SessionCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "xnft_state",
+            "type": "pubkey"
+          },
+          {
+            "name": "session_key",
+            "type": "pubkey"
+          },
+          {
+            "name": "expiry_ts",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SessionParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "expiry_ts",
+            "type": "i64"
+          },
+          {
+            "name": "daily_limit",
+            "type": "u64"
+          },
+          {
+            "name": "lifetime_limit",
+            "type": "u64"
+          },
+          {
+            "name": "velocity_limit",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SessionRevoked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "xnft_state",
+            "type": "pubkey"
+          },
+          {
+            "name": "session_key",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SharePriceUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_price",
+            "type": "u128"
+          },
+          {
+            "name": "new_price",
+            "type": "u128"
+          },
+          {
+            "name": "pool_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "total_shares",
+            "type": "u128"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StakeDeactivated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "pool_stake",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StakeDelegated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "pool_stake",
+            "type": "pubkey"
+          },
+          {
+            "name": "lamports",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StakeInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "pool_stake",
+            "type": "pubkey"
+          },
+          {
+            "name": "lamports",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StakePool",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "active_validator_count",
+            "type": "u8"
+          },
+          {
+            "name": "max_validators",
+            "type": "u8"
+          },
+          {
+            "name": "max_validator_pct_bps",
+            "type": "u16"
+          },
+          {
+            "name": "last_rebalance_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "reserve_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StakeWithdrawn",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "pool_stake",
+            "type": "pubkey"
+          },
+          {
+            "name": "lamports",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorAdded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "stake_account",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorEntry",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "stake_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "allocated_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "score",
+            "type": "u32"
+          },
+          {
+            "name": "last_scored_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "stake_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorScored",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "score",
+            "type": "u32"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "XNftMatured",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "class",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "XNftMinted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "class",
+            "type": "u8"
+          },
+          {
+            "name": "stake_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "shares",
+            "type": "u128"
+          },
+          {
+            "name": "unlock_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "XNftRedeemBegun",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "lamports_owed",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "XNftRedeemed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "lamports_returned",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "XNftState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "class",
+            "type": "u8"
+          },
+          {
+            "name": "nonce",
+            "type": "u64"
+          },
+          {
+            "name": "principal_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "shares",
+            "type": "u128"
+          },
+          {
+            "name": "last_share_price",
+            "type": "u128"
+          },
+          {
+            "name": "accrued_gain",
+            "type": "i64"
+          },
+          {
+            "name": "yield_mode",
+            "type": {
+              "defined": {
+                "name": "YieldMode"
+              }
+            }
+          },
+          {
+            "name": "yield_balance",
+            "type": "u64"
+          },
+          {
+            "name": "total_harvested",
+            "type": "u64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "unlock_at",
+            "type": "i64"
+          },
+          {
+            "name": "matured",
+            "type": "bool"
+          },
+          {
+            "name": "sessions_invalidated_at",
+            "type": "i64"
+          },
+          {
+            "name": "redeeming",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "XNftTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "from",
+            "type": "pubkey"
+          },
+          {
+            "name": "to",
+            "type": "pubkey"
+          },
+          {
+            "name": "sessions_invalidated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "YieldMode",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Compound"
+          },
+          {
+            "name": "Hybrid"
+          },
+          {
+            "name": "Treasury"
+          }
+        ]
+      }
+    },
+    {
+      "name": "YieldModeUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "old_mode",
+            "type": "u8"
+          },
+          {
+            "name": "new_mode",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "YieldSpent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "session_key",
+            "type": "pubkey"
+          },
+          {
+            "name": "program_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "destination",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "YieldWithdrawn",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ]
+}

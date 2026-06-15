@@ -1,0 +1,29 @@
+{
+  "name": "xnft-protocol",
+  "version": "0.1.0",
+  "description": "xNFT Protocol — XIP-0001: Transferable proof-of-commitment on X1 Network",
+  "private": true,
+  "workspaces": [
+    "sdk",
+    "examples/game-session",
+    "examples/marketplace-transfer"
+  ],
+  "scripts": {
+    "build": "anchor build",
+    "build:sdk": "npm run build --workspace=sdk",
+    "test": "anchor test",
+    "deploy:testnet": "anchor deploy --provider.cluster https://rpc.testnet.x1.xyz",
+    "idl": "anchor idl fetch 5VfCTcYpeG8ycZasHRdkXq4q8JPGAnmHHhvpK3mbEPwV",
+    "lint": "eslint . --ext .ts"
+  },
+  "devDependencies": {
+    "@coral-xyz/anchor": "^0.31.0",
+    "@types/chai": "^4.3.11",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.10.6",
+    "chai": "^4.3.10",
+    "mocha": "^10.2.0",
+    "ts-mocha": "^10.0.0",
+    "typescript": "^5.3.3"
+  }
+}

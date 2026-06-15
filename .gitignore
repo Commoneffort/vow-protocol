@@ -1,0 +1,33 @@
+# Rust / Anchor build artifacts
+target/
+.anchor/
+
+# Keep generated IDL and TypeScript types for integrators
+!target/idl/
+!target/types/
+
+# Node
+node_modules/
+sdk/node_modules/
+
+# Frontend — deployed separately to Vercel, not tracked here
+frontend/
+
+# Vercel deployment metadata
+.vercel/
+vercel.json
+.vercelignore
+
+# Test validator state — contains ephemeral keypairs, ledger data
+test-ledger/
+
+# Any stray keypair files that land in the repo root or scripts
+*.json.bak
+id.json
+*-keypair.json
+*-key.json
+
+# Misc
+.DS_Store
+*.log
+yarn-error.log

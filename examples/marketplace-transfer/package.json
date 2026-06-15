@@ -1,0 +1,13 @@
+{
+  "name": "xnft-example-marketplace-transfer",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "ts-node index.ts"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.31.0",
+    "@solana/web3.js": "^1.95",
+    "ts-node": "^10.9"
+  }
+}
