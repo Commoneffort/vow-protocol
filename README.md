@@ -360,14 +360,29 @@ await client.createAuthorityProfile(
 
 ## Permissionless Cranks
 
-These instructions can be called by anyone — no admin key required:
+These instructions require **no admin key** — anyone can call them:
 
-| Instruction | What it does |
-|-------------|-------------|
-| `update_share_price` | Reads X1 Foundation SPL pool ratio, updates `config.current_share_price`. Call daily to keep yield accrual accurate. |
-| `flush_reserve_to_pool` | Deposits idle SOL from the reserve into the SPL pool, receiving pXNT. This is what earns yield. |
-| `withdraw_from_pool` | Redeems pXNT for SOL to cover a pending unstake. Only succeeds if `reserve < escrow.lamports_owed`. |
-| `harvest` | Settles pending gain for an identity and credits `yield_balance`. |
+| Instruction | Who can call | What it does |
+|-------------|-------------|--------------|
+| `update_share_price` | Anyone, no signer | Reads `total_lamports` and `pool_token_supply` from the X1 Foundation SPL pool at fixed byte offsets. Updates `config.current_share_price`. Accepts no user-supplied values — the price comes entirely from on-chain pool state. |
+| `flush_reserve_to_pool` | Anyone, no signer | Deposits all idle SOL in the reserve PDA into the SPL stake pool, receiving pXNT. No-op if reserve has no SOL above rent-exempt minimum. This is what earns yield. |
+| `withdraw_from_pool` | Anyone, gated by escrow | Redeems pXNT for SOL to replenish the reserve before a pending unstake payout. Reverts if `reserve.lamports >= escrow.lamports_owed` — prevents unnecessary pool drain. Requires a live `UnstakeEscrow` PDA as proof of need. |
+| `harvest` | Anyone, no signer | Settles pending gain for an identity and credits `yield_balance`. No owner signature required — games and dApps can crank this permissionlessly. |
+| `deposit_yield_balance` | Anyone, no signer | Deposits XNT into the reserve and credits an identity's `yield_balance`. Session keys, dApp servers, or users can call this to seed spending before yield accrues. |
+
+### What actually requires admin
+
+Only these instructions check `config.admin` and require its signature:
+
+| Instruction | Why admin |
+|-------------|-----------|
+| `initialize` | One-time setup — sets `config.admin` to the signer |
+| `set_admin` | Transfers admin to a new key |
+| `verify_app` / `block_app` | App registry curation |
+| `dev_set_share_price` | Testnet only — blocked when real SPL pool is configured |
+
+Current protocol admin: `BPmZB128HNvmzubP4rwJTTNLmk9ucK71Jtqt7MowKV8M`  
+Same key as the program upgrade authority (`~/.config/solana/vow-key.json`).
 
 The protocol's daily systemd crank calls `update_share_price` and `flush_reserve_to_pool` automatically, but anyone can call them.
 
@@ -455,6 +470,8 @@ RPC=https://rpc.mainnet.x1.xyz \
 | Reserve | `4mn9erFousBJp1NWCfCosZVjoatHnD16pZTN3K6t1pqC` |
 | SPL Pool | `X1SPaMUM1A8E1vKL8XQAB5rxKarJbqtWFFSNFs8f7Av` |
 | pXNT Mint | `pXNTyoqQsskHdZ7Q1rnP25FEyHHjissbs7n6RRN2nP5` |
+| Protocol admin | `BPmZB128HNvmzubP4rwJTTNLmk9ucK71Jtqt7MowKV8M` |
+| Upgrade authority | `BPmZB128HNvmzubP4rwJTTNLmk9ucK71Jtqt7MowKV8M` (same key) |
 
 ---
 
