@@ -174,11 +174,14 @@ pub fn net_entry_lamports(config: &ProtocolConfig, lamports: u64) -> Result<u128
 /// Shares minted for a fresh stake deposit at the current (fresh) price.
 pub fn shares_for_deposit(config: &ProtocolConfig, lamports: u64) -> Result<u128> {
     require!(config.current_share_price > 0, VowError::MathOverflow);
-    net_entry_lamports(config, lamports)?
+    let shares = net_entry_lamports(config, lamports)?
         .checked_mul(SHARE_PRECISION)
         .ok_or(VowError::MathOverflow)?
         .checked_div(config.current_share_price)
-        .ok_or(error!(VowError::MathOverflow))
+        .ok_or(error!(VowError::MathOverflow))?;
+    // Never accept a deposit that buys nothing.
+    require!(shares > 0, VowError::InsufficientStake);
+    Ok(shares)
 }
 
 /// Value-moving instructions must use a price computed from this epoch's pool state,
@@ -206,22 +209,40 @@ pub struct NavInputs {
     pub total_shares: u128,
 }
 
-/// NAV-based share price (see module docs). Rounds down — dust stays with the protocol.
-pub fn nav_share_price(i: &NavInputs) -> Result<u128> {
+/// Max share price relative to the pool's redeemable rate (5/4 = 125%). Honest NAV sits
+/// within a few % of the rate (pool surplus, saved fees); anything above this can only
+/// come from donations or a near-empty share supply, and pricing off it would let a
+/// sole holder inflate the price and steal the next depositor's rounding remainder.
+pub const MAX_PRICE_OVER_RATE_NUM: u128 = 5;
+pub const MAX_PRICE_OVER_RATE_DEN: u128 = 4;
+
+pub struct NavPrice {
+    pub price: u128,
+    /// false when liabilities exceed every asset (NAV would be negative). The caller
+    /// must then halt value-moving instructions instead of pricing at ~0.
+    pub solvent: bool,
+}
+
+/// NAV-based share price (see module docs), capped at 125% of the redeemable pool
+/// rate. Rounds down — dust stays with the protocol.
+pub fn nav_share_price(i: &NavInputs) -> Result<NavPrice> {
     require!(i.pool_token_supply > 0 && i.pool_total_lamports > 0, VowError::EmptyReserve);
     let w = fee_factor(i.withdrawal_fee_ppm);
     let d = fee_factor(i.deposit_fee_ppm);
 
+    // Redeemable value of one pool-token-lamport, in share-price units.
+    let rate_price = ((i.pool_total_lamports as u128)
+        .checked_mul(SHARE_PRECISION)
+        .ok_or(VowError::MathOverflow)?
+        / i.pool_token_supply as u128)
+        .checked_mul(w)
+        .ok_or(VowError::MathOverflow)?
+        / PPM;
+    let rate_price = rate_price.max(1);
+    let cap = rate_price * MAX_PRICE_OVER_RATE_NUM / MAX_PRICE_OVER_RATE_DEN;
+
     if i.total_shares == 0 {
-        // No holders: price = redeemable value of 1 pXNT-lamport-equivalent.
-        return Ok(((i.pool_total_lamports as u128)
-            .checked_mul(SHARE_PRECISION)
-            .ok_or(VowError::MathOverflow)?
-            / i.pool_token_supply as u128)
-            .checked_mul(w)
-            .ok_or(VowError::MathOverflow)?
-            / PPM)
-            .map(|p| p.max(1));
+        return Ok(NavPrice { price: rate_price, solvent: true });
     }
 
     let pxnt_value = (i.pxnt_amount as u128)
@@ -233,17 +254,19 @@ pub fn nav_share_price(i: &NavInputs) -> Result<u128> {
     let liquid = (i.reserve_lamports as u128).saturating_sub(i.rent_exempt as u128);
     let liabilities = i.total_yield_claims as u128 + i.total_pending_unstake as u128;
 
-    let nav = if liquid >= liabilities {
-        pxnt_value + (liquid - liabilities) * d / PPM * w / PPM
+    let (nav, solvent) = if liquid >= liabilities {
+        (pxnt_value + (liquid - liabilities) * d / PPM * w / PPM, true)
     } else {
-        pxnt_value.saturating_sub(liabilities - liquid)
+        let shortfall = liabilities - liquid;
+        (pxnt_value.saturating_sub(shortfall), pxnt_value >= shortfall)
     };
 
-    Ok((nav
+    let price = (nav
         .checked_mul(SHARE_PRECISION)
         .ok_or(VowError::MathOverflow)?
         / i.total_shares)
-        .max(1))
+        .clamp(1, cap);
+    Ok(NavPrice { price, solvent })
 }
 
 /// SOL the reserve must keep liquid: rent floor + every fixed claim on it.
@@ -281,8 +304,8 @@ mod tests {
         let mut flushed = base();
         flushed.pxnt_amount = 99_900_000_000; // 100 XNT · (1 − 0.1%)
         flushed.total_shares = idle.total_shares;
-        let a = nav_share_price(&idle).unwrap();
-        let b = nav_share_price(&flushed).unwrap();
+        let a = nav_share_price(&idle).unwrap().price;
+        let b = nav_share_price(&flushed).unwrap().price;
         assert!(a.abs_diff(b) <= 1, "{a} vs {b}");
         assert!(a.abs_diff(SHARE_PRECISION) <= 1);
     }
@@ -292,14 +315,37 @@ mod tests {
         let mut i = base();
         i.pxnt_amount = 10_000_000_000;
         i.total_shares = 9_990_000_000;
-        let before = nav_share_price(&i).unwrap();
+        let before = nav_share_price(&i).unwrap().price;
         // 1 XNT claimed and the reserve is short: NAV drops by exactly that claim.
         i.total_yield_claims = 1_000_000_000;
-        let after = nav_share_price(&i).unwrap();
+        let after = nav_share_price(&i).unwrap().price;
         let drop = (before - after) * i.total_shares / SHARE_PRECISION;
         assert!(drop.abs_diff(1_000_000_000) <= 2, "{drop}");
         // Deposit 1 XNT of SOL to back it: back to the original price.
         i.reserve_lamports += 1_000_000_000;
-        assert!(nav_share_price(&i).unwrap().abs_diff(before) <= 1);
+        assert!(nav_share_price(&i).unwrap().price.abs_diff(before) <= 1);
+    }
+
+    #[test]
+    fn price_is_capped_against_inflation() {
+        // Sole holder with 49 shares and a huge donation: uncapped this prices a share at
+        // ~1e9× the pool rate. Capped, a share is worth at most 1.25× redeemable rate.
+        let mut i = base();
+        i.pxnt_amount = 50_000_000_000;
+        i.reserve_lamports += 1_000_000_000_000_000; // 1M XNT donated
+        i.total_shares = 49;
+        let p = nav_share_price(&i).unwrap();
+        let rate = SHARE_PRECISION * 999 / 1000;
+        assert_eq!(p.price, rate * 5 / 4);
+        assert!(p.solvent);
+    }
+
+    #[test]
+    fn insolvency_is_flagged() {
+        let mut i = base();
+        i.pxnt_amount = 1_000_000_000;
+        i.total_shares = 1_000_000_000;
+        i.total_yield_claims = 2_000_000_000; // owes more than everything it holds
+        assert!(!nav_share_price(&i).unwrap().solvent);
     }
 }

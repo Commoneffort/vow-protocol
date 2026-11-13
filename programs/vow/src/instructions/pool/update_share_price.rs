@@ -71,7 +71,7 @@ pub fn handler(ctx: Context<UpdateSharePrice>) -> Result<()> {
     let config = &mut ctx.accounts.config;
     let old_price = config.current_share_price;
 
-    let new_price = nav_share_price(&NavInputs {
+    let nav = nav_share_price(&NavInputs {
         reserve_lamports: ctx.accounts.reserve.lamports(),
         rent_exempt,
         total_yield_claims: config.total_yield_claims,
@@ -84,11 +84,21 @@ pub fn handler(ctx: Context<UpdateSharePrice>) -> Result<()> {
         total_shares: config.total_shares,
     })?;
 
-    config.current_share_price = new_price;
     config.last_pool_lamports = pool.total_lamports;
-    config.price_epoch = pool.last_update_epoch;
     config.deposit_fee_ppm = pool.deposit_fee_ppm;
     config.withdrawal_fee_ppm = pool.withdrawal_fee_ppm;
+    if !nav.solvent {
+        // Liabilities exceed every asset (e.g. a pool slash). Pricing at ~0 would let
+        // newcomers' deposits silently cover the hole and first exits drain the rest, so
+        // leave the price untouched and mark it stale: every value-moving instruction
+        // halts (PriceStale) until the protocol is solvent again or is upgraded.
+        config.price_epoch = 0;
+        msg!("update_share_price: protocol insolvent — value-moving instructions halted");
+        return Ok(());
+    }
+    let new_price = nav.price;
+    config.current_share_price = new_price;
+    config.price_epoch = pool.last_update_epoch;
 
     emit!(SharePriceUpdated {
         old_price,

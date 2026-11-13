@@ -87,6 +87,8 @@ const fmt = (l: bigint) => (Number(l) / XNT).toFixed(9);
       config: configPda, splPool, reserve, reservePoolTokens: ata, tokenProgram: TOKEN_PROGRAM,
     });
   const update = () => updateIx().rpc();
+  const harvest_ = (v: PublicKey) =>
+    program.methods.harvest().accountsStrict({ config: configPda, vowState: v }).rpc();
 
   const flushBuilder = () =>
     program.methods.flushReserveToPool().accountsStrict({
@@ -345,5 +347,60 @@ const fmt = (l: bigint) => (Number(l) / XNT).toFixed(9);
     const owedToNew = (n.shares * n.price) / PREC + big(c.totalYieldClaims);
     console.log(`      remaining assets=${fmt(assets)} owed to remaining holder=${fmt(owedToNew)}`);
     expect(assets >= owedToNew).to.be.true;
+  });
+
+  it("share-price inflation: a sole holder can't make the next depositor lose to rounding", async () => {
+    // newUser is now the only holder (Treasury mode). Attack loop: donate SOL to the
+    // reserve → update price → harvest (burns shares at the inflated price) → withdraw
+    // the donation back as yield. Repeat to shrink total_shares and blow up the price.
+    const attacker = newUser;
+    // Faucet caps airdrops; fund from the genesis wallet (provider) instead.
+    await provider.sendAndConfirm(new anchor.web3.Transaction().add(
+      SystemProgram.transfer({ fromPubkey: provider.wallet.publicKey, toPubkey: attacker.publicKey, lamports: 10_000_000 * XNT })));
+    for (let round = 0; round < 3; round++) {
+      const c = await cfg();
+      const value = (big(c.totalShares) * big(c.currentSharePrice)) / PREC;
+      const donation = value * 1000n;
+      if (donation > 9_000_000n * BigInt(XNT)) break;
+      await provider.sendAndConfirm(new anchor.web3.Transaction().add(
+        SystemProgram.transfer({ fromPubkey: attacker.publicKey, toPubkey: reserve, lamports: Number(donation) })), [attacker]);
+      await update();
+      await harvest_(newVow);
+      const bal = big((await vow(newVow)).yieldBalance);
+      if (bal === 0n) { console.log(`      round ${round}: nothing left to extract (price capped)`); break; }
+      await ensureLiquid();
+      await program.methods.withdrawYield(new BN(bal.toString())).accountsStrict({
+        config: configPda, vowState: newVow, reserve, owner: attacker.publicKey, systemProgram: SystemProgram.programId,
+      }).signers([attacker]).rpc();
+      const after = await cfg();
+      console.log(`      round ${round}: shares=${after.totalShares.toString()} price=${Number(after.currentSharePrice) / 1e12}`);
+    }
+
+    // Victim deposits 10 XNT. Their claim must be worth what they put in (net of pool fees).
+    const victim = Keypair.generate();
+    await conn.confirmTransaction(await conn.requestAirdrop(victim.publicKey, 20 * XNT), "confirmed");
+    const c = await cfg();
+    const assetId = pda([Buffer.from("vow_asset"), new BN(c.totalMinted).toArrayLike(Buffer, "le", 8)]);
+    const vv = pda([Buffer.from("vow"), assetId.toBuffer()]);
+    const stake = 10n * BigInt(XNT);
+    let minted = true;
+    try {
+      await program.methods.mintVow(new BN(stake.toString()), { compound: {} }).accountsStrict({
+        config: configPda, assetIdAccount: assetId, vowState: vv, reserve,
+        ownerIndex: pda([Buffer.from("owner_index"), victim.publicKey.toBuffer()]),
+        owner: victim.publicKey, systemProgram: SystemProgram.programId,
+      }).preInstructions([await updateIx().instruction()]).signers([victim]).rpc();
+    } catch (e: any) {
+      minted = false; // rejecting the deposit outright is also safe
+      console.log(`      victim mint rejected: ${String(e).slice(0, 120)}`);
+    }
+    if (minted) {
+      await update();
+      const after = await cfg();
+      const worth = (big((await vow(vv)).shares) * big(after.currentSharePrice)) / PREC;
+      const net = (stake * (PPM - BigInt(after.depositFeePpm)) * (PPM - BigInt(after.withdrawalFeePpm))) / (PPM * PPM);
+      console.log(`      victim deposited ${fmt(stake)} → claim worth ${fmt(worth)} (net-of-fees ${fmt(net)})`);
+      expect(Number(net - worth), "victim rounding loss (lamports)").to.be.lessThan(1000);
+    }
   });
 });

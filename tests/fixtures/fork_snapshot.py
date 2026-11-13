@@ -97,9 +97,18 @@ for t in token_accts:
 
 # Every account owned by the vow program; VowStates (214 bytes) get local owners.
 VOW_STATE_LEN = 214
+OWNER_INDEX_LEN = 73
+CONFIG_LEN = 202
+# Rebuild pre-migration state (default) so the migration path stays testable after the
+# 2026-11-13 upgrade: config freshness bytes zeroed, OwnerIndex accounts dropped.
+pre_migration = os.environ.get("FORK_PRE_MIGRATION", "1") == "1"
 owners = {}
 for a in rpc("getProgramAccounts", [vow_id, {"encoding": "base64"}]):
     data = bytearray(base64.b64decode(a["account"]["data"][0]))
+    if pre_migration and len(data) == OWNER_INDEX_LEN:
+        continue
+    if pre_migration and len(data) == CONFIG_LEN:
+        data[96:128] = bytes(32)  # price_epoch, fee ppm, _reserved (formerly merkle_tree)
     if len(data) == VOW_STATE_LEN:
         real_owner = b58encode(bytes(data[40:72]))
         if real_owner not in owners:
