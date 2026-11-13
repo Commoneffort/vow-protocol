@@ -10,7 +10,7 @@
 
 ## What It Is
 
-Each wallet can hold exactly one Vow identity. It is:
+Each wallet can hold exactly one Vow identity (enforced on-chain by the `["owner_index", wallet]` PDA; the few wallets that minted several before enforcement keep them, grandfathered). It is:
 
 - **Soulbound** — non-transferable. The credential belongs to the wallet that created it, forever.
 - **Permanent** — the account never closes. Unstaking transitions the identity to Dormant, not deleted. All history is preserved.
@@ -42,7 +42,7 @@ Free accounts cost nothing to create, so they prove nothing. A Vow identity requ
 | 6 | Amethyst | 5,001 XNT | 1,095 days |
 | 7 | Xenturion | 10,001 XNT | 1,825 days |
 
-Topping up stake upgrades the class and resets the lock period. `highest_class_ever` never decreases.
+Every top-up (`add_stake`) re-locks the whole position for the (possibly upgraded) class duration — topped-up principal is always committed for a full lock. `highest_class_ever` never decreases.
 
 ---
 
@@ -364,9 +364,9 @@ These instructions require **no admin key** — anyone can call them:
 
 | Instruction | Who can call | What it does |
 |-------------|-------------|--------------|
-| `update_share_price` | Anyone, no signer | Reads `total_lamports` and `pool_token_supply` from the X1 Foundation SPL pool at fixed byte offsets. Updates `config.current_share_price`. Accepts no user-supplied values — the price comes entirely from on-chain pool state. |
-| `flush_reserve_to_pool` | Anyone, no signer | Deposits all idle SOL in the reserve PDA into the SPL stake pool, receiving pXNT. No-op if reserve has no SOL above rent-exempt minimum. This is what earns yield. |
-| `withdraw_from_pool` | Anyone, gated by escrow | Redeems pXNT for SOL to replenish the reserve before a pending unstake payout. Reverts if `reserve.lamports >= escrow.lamports_owed` — prevents unnecessary pool drain. Requires a live `UnstakeEscrow` PDA as proof of need. |
+| `update_share_price` | Anyone, no signer | Sets the share price to **NAV / total_shares**, where NAV is what the protocol can actually pay out: reserve SOL + pXNT at the pool rate net of the withdrawal fee, minus everything owed (yield balances + pending unstakes). Records the pool's epoch and fees. Value-moving instructions (mint, add_stake, activate_stake, harvest, begin_unstake, update_yield_mode) fail with `PriceStale` unless this ran for the current epoch — clients prepend it to the same transaction. |
+| `flush_reserve_to_pool` | Anyone, no signer | Deposits only **idle** reserve SOL into the SPL stake pool. SOL backing yield balances and pending unstakes always stays liquid, so `yield_spend` / `withdraw_yield` / `complete_unstake` never get stranded. Referral-fee account is pinned to the reserve's own pXNT ATA. |
+| `withdraw_from_pool` | Anyone, gated by need | Redeems just enough pXNT (grossed up for the pool fee) to cover what the protocol owes right now. Reverts with `ReserveSufficient` otherwise, so nobody can drain the position. Right after an epoch boundary the stake program briefly rejects withdrawals (`EpochRewardsActive`, 0x10) — retry. |
 | `harvest` | Anyone, no signer | Settles pending gain for an identity and credits `yield_balance`. No owner signature required — games and dApps can crank this permissionlessly. |
 | `deposit_yield_balance` | Anyone, no signer | Deposits XNT into the reserve and credits an identity's `yield_balance`. Session keys, dApp servers, or users can call this to seed spending before yield accrues. |
 
@@ -376,15 +376,19 @@ Only these instructions check `config.admin` and require its signature:
 
 | Instruction | Why admin |
 |-------------|-----------|
-| `initialize` | One-time setup — sets `config.admin` to the signer |
-| `set_admin` | Transfers admin to a new key |
+| `initialize` | One-time setup — must be signed by the program's **upgrade authority**; sets `config.admin` to the signer |
+| `set_admin` | Transfers admin to a new key — the **new admin must co-sign** (`scripts/set_admin.ts`) |
 | `verify_app` / `block_app` | App registry curation |
 | `dev_set_share_price` | Testnet only — blocked when real SPL pool is configured |
 
 Current protocol admin: `BPmZB128HNvmzubP4rwJTTNLmk9ucK71Jtqt7MowKV8M`  
 Same key as the program upgrade authority (`~/.config/solana/vow-key.json`).
 
-The protocol's daily systemd crank calls `update_share_price` and `flush_reserve_to_pool` automatically, but anyone can call them.
+The protocol's daily systemd crank (`scripts/daily_crank.ts`) calls `update_share_price`, `flush_reserve_to_pool` and, when needed, `withdraw_from_pool`, but anyone can call them.
+
+### Fair-share accounting
+
+Every share is an equal claim on what the protocol can actually redeem. New stake buys shares at its value *net of the pool round-trip fees it will incur* (0.1% in + 0.1% out today), so existing holders never pay a newcomer's fees, and flushing, withdrawing, depositing or spending yield never moves the price. Unstakers are paid exactly `shares × price + yield_balance` as locked in at `begin_unstake` — `complete_unstake` reverts (`ReserveIlliquid`) rather than ever paying a partial amount. Verified on a mainnet fork: `tests/run-mainnet-fork-test.sh`.
 
 ---
 
@@ -498,7 +502,7 @@ sdk/src/
   types.ts          — TypeScript types
 
 scripts/
-  daily_crank.ts    — update_share_price + flush_reserve_to_pool
+  daily_crank.ts    — update_share_price + flush_reserve_to_pool + withdraw_from_pool (if short)
   initialize-protocol.ts
   check_yield.ts
 

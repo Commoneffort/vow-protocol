@@ -5,6 +5,7 @@ pub mod constants;
 pub mod errors;
 pub mod events;
 pub mod instructions;
+pub mod pool_math;
 pub mod state;
 
 use instructions::*;
@@ -27,10 +28,6 @@ pub mod vow {
 
     pub fn set_admin(ctx: Context<SetAdmin>) -> Result<()> {
         instructions::admin::set_admin::handler(ctx)
-    }
-
-    pub fn close_protocol_config(ctx: Context<CloseProtocolConfig>) -> Result<()> {
-        instructions::admin::close_config::handler(ctx)
     }
 
     pub fn set_mint_counter(ctx: Context<SetMintCounter>, new_counter: u64) -> Result<()> {
@@ -75,6 +72,12 @@ pub mod vow {
 
     pub fn add_stake(ctx: Context<AddStake>, lamports_to_add: u64) -> Result<()> {
         instructions::vow::add_stake::handler(ctx, lamports_to_add)
+    }
+
+    /// Records the canonical identity for a wallet that minted before OwnerIndex
+    /// existed, so `mint_vow` from that wallet is blocked from then on. Permissionless.
+    pub fn backfill_owner_index(ctx: Context<BackfillOwnerIndex>) -> Result<()> {
+        instructions::vow::backfill_owner_index::handler(ctx)
     }
 
     pub fn mint_vow(

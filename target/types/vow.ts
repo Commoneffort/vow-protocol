@@ -214,6 +214,84 @@ export type Vow = {
       ]
     },
     {
+      "name": "backfillOwnerIndex",
+      "docs": [
+        "Records the canonical identity for a wallet that minted before OwnerIndex",
+        "existed, so `mint_vow` from that wallet is blocked from then on. Permissionless."
+      ],
+      "discriminator": [
+        197,
+        27,
+        201,
+        241,
+        156,
+        178,
+        190,
+        95
+      ],
+      "accounts": [
+        {
+          "name": "vowState",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vow_state.asset_id",
+                "account": "vowState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ownerIndex",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  95,
+                  105,
+                  110,
+                  100,
+                  101,
+                  120
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vow_state.owner",
+                "account": "vowState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "beginUnstake",
       "discriminator": [
         156,
@@ -426,49 +504,6 @@ export type Vow = {
           "relations": [
             "authorityProfile"
           ]
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "closeProtocolConfig",
-      "discriminator": [
-        203,
-        147,
-        4,
-        67,
-        17,
-        28,
-        203,
-        219
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "docs": [
-            "close a config account whose layout has changed across a program upgrade."
-          ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "admin",
-          "writable": true,
-          "signer": true
         }
       ],
       "args": []
@@ -1167,8 +1202,8 @@ export type Vow = {
         {
           "name": "reservePoolTokens",
           "docs": [
-            "Reserve's ATA for pXNT — must be pre-created (X1 uses a non-standard ATA program;",
-            "frontend calls ensureReserveAta() before the first flush)."
+            "Reserve's canonical pXNT ATA (address pinned in handler) — must be pre-created",
+            "(X1 uses a non-standard ATA program; frontend calls ensureReserveAta())."
           ],
           "writable": true
         },
@@ -1189,21 +1224,22 @@ export type Vow = {
         {
           "name": "poolReserveStake",
           "docs": [
-            "Pool's reserve stake account — read from pool account data at offset 131"
+            "Pool's reserve stake account"
           ],
           "writable": true
         },
         {
           "name": "poolManagerFeeAccount",
           "docs": [
-            "Pool manager fee account — read from pool account data at offset 195"
+            "Pool manager fee account"
           ],
           "writable": true
         },
         {
           "name": "poolReferralFeeAccount",
           "docs": [
-            "Referral fee destination — pass same as manager_fee if no referral program"
+            "Referral fee destination — pinned to our own pXNT ATA so any referral share of",
+            "the deposit fee comes back to the protocol instead of to whoever cranks."
           ],
           "writable": true
         },
@@ -1339,11 +1375,15 @@ export type Vow = {
           }
         },
         {
-          "name": "splPool",
+          "name": "program",
           "docs": [
-            "X1 Foundation SPL stake pool — read at init to set the correct opening share price.",
-            "On testnet pass SystemProgram.programId (no-op: price stays at SHARE_PRECISION)."
-          ]
+            "Only the program's upgrade authority may initialize. Without this, whoever",
+            "called `initialize` first (on a fresh deploy) would become admin."
+          ],
+          "address": "7ytRMwKykiJnbT3gdLXPCUZMzrTNZZbr7m2i7fwiyjbJ"
+        },
+        {
+          "name": "programData"
         },
         {
           "name": "admin",
@@ -1466,6 +1506,37 @@ export type Vow = {
                   118,
                   101
                 ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "ownerIndex",
+          "docs": [
+            "One identity per wallet: `init` fails if this wallet already has one."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  95,
+                  105,
+                  110,
+                  100,
+                  101,
+                  120
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
               }
             ]
           }
@@ -1867,7 +1938,12 @@ export type Vow = {
           ]
         },
         {
-          "name": "newAdmin"
+          "name": "newAdmin",
+          "docs": [
+            "The new admin must co-sign, proving the key exists and is controlled —",
+            "prevents handing admin to a typo'd or unowned address."
+          ],
+          "signer": true
         }
       ],
       "args": []
@@ -2025,10 +2101,37 @@ export type Vow = {
         {
           "name": "splPool",
           "docs": [
-            "The X1 Foundation SPL stake pool account.",
-            "Address is verified against config.spl_stake_pool so the crank",
-            "cannot pass an attacker-controlled account to manipulate the price."
+            "The X1 Foundation SPL stake pool account."
           ]
+        },
+        {
+          "name": "reserve",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  115,
+                  101,
+                  114,
+                  118,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "reservePoolTokens",
+          "docs": [
+            "Reserve's canonical pXNT ATA (address pinned in handler)."
+          ]
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         }
       ],
       "args": []
@@ -2222,37 +2325,9 @@ export type Vow = {
           }
         },
         {
-          "name": "unstakeEscrow",
-          "docs": [
-            "The pending unstake that justifies this withdrawal.",
-            "Proves there is a real payout that the reserve cannot currently cover."
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  117,
-                  110,
-                  115,
-                  116,
-                  97,
-                  107,
-                  101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "unstake_escrow.vow_state",
-                "account": "unstakeEscrow"
-              }
-            ]
-          }
-        },
-        {
           "name": "reservePoolTokens",
           "docs": [
-            "Reserve's pXNT token account — tokens to burn"
+            "Reserve's canonical pXNT ATA — tokens to burn (address pinned in handler)"
           ],
           "writable": true
         },
@@ -2272,14 +2347,14 @@ export type Vow = {
         {
           "name": "poolReserveStake",
           "docs": [
-            "Pool's reserve stake account — read from pool data at offset 131"
+            "Pool's reserve stake account"
           ],
           "writable": true
         },
         {
           "name": "poolManagerFeeAccount",
           "docs": [
-            "Pool manager fee account — read from pool data at offset 195"
+            "Pool manager fee account"
           ],
           "writable": true
         },
@@ -2504,11 +2579,12 @@ export type Vow = {
         {
           "name": "appRegistry",
           "docs": [
-            "Optional: app registry entry for the calling program.",
-            "C-1 fix: seeds enforced at instruction level — caller must pass the registry",
-            "for `calling_program`, not a different program's."
+            "Canonical app registry PDA for `calling_program`. Always required, but may be",
+            "uninitialized (app never registered). Previously this was `Option<…>`, which let",
+            "a caller pass `None` and skip the `blocked` check entirely — `block_app` had no",
+            "teeth. The seed constraint pins it to calling_program; the handler deserializes",
+            "it only when it is initialized and owned by this program."
           ],
-          "optional": true,
           "pda": {
             "seeds": [
               {
@@ -2566,6 +2642,21 @@ export type Vow = {
         {
           "name": "systemProgram",
           "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "callerAuthority",
+          "docs": [
+            "Proof that `calling_program` itself authorized this spend: the PDA",
+            "`[VOW_CALLER_SEED]` derived under `calling_program`, which must be a signer.",
+            "Only `calling_program` can produce that signature (via `invoke_signed`), so this",
+            "proves the spend arrived by CPI from the whitelisted app — not from a session-key",
+            "holder who merely *named* a whitelisted program and picked their own destination.",
+            "",
+            "Required when the session has a program whitelist (`program_count > 0`).",
+            "Ignored for unrestricted sessions (`program_count == 0`), where the owner has",
+            "explicitly allowed the session key to pay any destination."
+          ],
+          "optional": true
         }
       ],
       "args": [
@@ -2627,6 +2718,19 @@ export type Vow = {
         65,
         121,
         0
+      ]
+    },
+    {
+      "name": "ownerIndex",
+      "discriminator": [
+        28,
+        249,
+        139,
+        158,
+        18,
+        18,
+        173,
+        96
       ]
     },
     {
@@ -3085,6 +3189,31 @@ export type Vow = {
       "code": 6035,
       "name": "sharePriceNotSynced",
       "msg": "Share price not yet synced from pool — call update_share_price before minting"
+    },
+    {
+      "code": 6036,
+      "name": "callerNotAuthorized",
+      "msg": "Whitelisted session spend must be signed by the calling program's vow_caller PDA (CPI only)"
+    },
+    {
+      "code": 6037,
+      "name": "priceStale",
+      "msg": "Share price is stale for this epoch — call update_share_price first (same transaction is fine)"
+    },
+    {
+      "code": 6038,
+      "name": "reserveIlliquid",
+      "msg": "Reserve lacks liquid SOL for this payout — call withdraw_from_pool first"
+    },
+    {
+      "code": 6039,
+      "name": "invalidPoolTokenAccount",
+      "msg": "Pool token account must be the reserve's canonical pXNT associated token account"
+    },
+    {
+      "code": 6040,
+      "name": "unsupportedPoolConfig",
+      "msg": "Stake pool configuration not supported (SOL deposit/withdraw authority set)"
     }
   ],
   "types": [
@@ -3331,6 +3460,31 @@ export type Vow = {
       }
     },
     {
+      "name": "ownerIndex",
+      "docs": [
+        "One per wallet: `[\"owner_index\", owner]`. Created by `mint_vow` (so a second mint",
+        "from the same wallet fails) or by `backfill_owner_index` for identities minted",
+        "before this account existed. `vow_state` is the wallet's canonical identity."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "vowState",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "protocolConfig",
       "type": {
         "kind": "struct",
@@ -3360,8 +3514,35 @@ export type Vow = {
             "type": "u64"
           },
           {
-            "name": "merkleTree",
-            "type": "pubkey"
+            "name": "priceEpoch",
+            "docs": [
+              "Pool `last_update_epoch` observed by the last update_share_price. Value-moving",
+              "instructions require this to be >= the current epoch (see `require_fresh_price`)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "depositFeePpm",
+            "docs": [
+              "Pool SOL deposit fee, parts-per-million (rounded up)."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "withdrawalFeePpm",
+            "docs": [
+              "Pool SOL withdrawal fee, parts-per-million (rounded up; max of current/scheduled)."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
           },
           {
             "name": "totalPendingUnstake",
@@ -3393,10 +3574,6 @@ export type Vow = {
         "fields": [
           {
             "name": "admin",
-            "type": "pubkey"
-          },
-          {
-            "name": "merkleTree",
             "type": "pubkey"
           }
         ]

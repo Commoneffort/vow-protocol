@@ -1,5 +1,5 @@
 import { PublicKey } from "@solana/web3.js";
-import BN from "bn.js";
+import { BN } from "@coral-xyz/anchor";
 
 export type YieldMode = { compound: {} } | { hybrid: {} } | { treasury: {} };
 
@@ -27,18 +27,19 @@ export const SHARE_PRECISION = new BN("1000000000000"); // 1e12
 
 export interface ProtocolConfig {
   admin: PublicKey;
-  paused: boolean;
   currentSharePrice: BN;
   totalShares: BN;
   totalYieldClaims: BN;
   lastPoolLamports: BN;
   totalMinted: BN;
-  merkleTree: PublicKey;
-  creditsWeight: number;
-  selfStakeWeight: number;
-  selfStakeCeil: BN;
-  skipPenalty: number;
-  commissionPenalty: number;
+  /** Pool last_update_epoch seen by the last update_share_price (freshness gate). */
+  priceEpoch: BN;
+  depositFeePpm: number;
+  withdrawalFeePpm: number;
+  totalPendingUnstake: BN;
+  splStakePool: PublicKey;
+  splPoolMint: PublicKey;
+  reserveBump: number;
   bump: number;
 }
 
@@ -63,10 +64,11 @@ export interface XNftState {
 }
 
 export interface SessionAccount {
-  xnftState: PublicKey;
+  idnftState: PublicKey;
   sessionKey: PublicKey;
   allowedProgramIds: PublicKey[];
   programCount: number;
+  sessionIndex: number;
   startTs: BN;
   expiryTs: BN;
   dailyLimit: BN;
@@ -92,25 +94,6 @@ export interface AuthorityProfile {
   uriLen: number;
   createdAt: BN;
   bump: number;
-}
-
-export interface ValidatorEntry {
-  voteAccount: PublicKey;
-  stakeAccount: PublicKey;
-  allocatedLamports: BN;
-  score: number;
-  lastScoredEpoch: BN;
-  active: boolean;
-  bump: number;
-  stakeBump: number;
-}
-
-export interface ScoringWeights {
-  creditsWeight: number;
-  selfStakeWeight: number;
-  selfStakeCeil: BN;
-  skipPenalty: number;
-  commissionPenalty: number;
 }
 
 export interface SessionParams {

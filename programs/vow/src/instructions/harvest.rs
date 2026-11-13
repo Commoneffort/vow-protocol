@@ -7,6 +7,9 @@ use crate::state::{VowState, ProtocolConfig, YieldMode};
 /// Internal helper: settle VOW's accrued gain against the current share price.
 /// Must be called before any mutation to yield_mode, yield_balance, or shares.
 pub fn settle_idnft(idnft: &mut VowState, config: &ProtocolConfig) -> Result<()> {
+    // Settling at a stale price would lock in gains/losses the pool hasn't realized
+    // (or has already reversed) at the expense of other holders.
+    crate::pool_math::require_fresh_price(config)?;
     if idnft.last_share_price == config.current_share_price {
         return Ok(());
     }

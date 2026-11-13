@@ -15,8 +15,32 @@ vow = "7ytRMwKykiJnbT3gdLXPCUZMzrTNZZbr7m2i7fwiyjbJ"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "http://localhost:8980"
-wallet = "~/.config/solana/id.json"
+# Local test validator on a non-default port: 8899/8900 are used by the real validator
+# on this host. (Wallet moved off the retired id.json.)
+# Mainnet deploys always pass --provider.wallet ~/.config/solana/vow-key.json explicitly.
+cluster = "localnet"
+wallet = "~/.config/solana/admin.json"
+
+[test]
+startup_wait = 60000
+
+[test.validator]
+bind_address = "127.0.0.1"
+rpc_port = 28899
+url = "http://127.0.0.1:28899"
+gossip_port = 28001
+dynamic_port_range = "28019-28069"
+faucet_port = 29900
+slots_per_epoch = "64"
+
+# Load vow as an upgradeable program whose authority is provider.wallet, so the
+# upgrade-authority-gated `initialize` can run in tests.
+[[test.genesis]]
+address = "7ytRMwKykiJnbT3gdLXPCUZMzrTNZZbr7m2i7fwiyjbJ"
+program = "target/deploy/vow.so"
+upgradeable = true
 
 [scripts]
-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+# Core suite only. Full coverage: tests/run-local-tests.sh (adds the CPI-caller suite)
+# and tests/run-mainnet-fork-test.sh (pool / NAV / fair-share checks on a mainnet fork).
+test = "npx ts-mocha -p ./tsconfig.json -t 1000000 tests/protocol.test.ts"

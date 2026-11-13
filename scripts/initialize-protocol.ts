@@ -56,16 +56,22 @@ async function main() {
   console.log(`  SPL Stake Pool: ${SPL_STAKE_POOL.toBase58()}`);
   console.log(`  SPL Pool Mint:  ${SPL_POOL_MINT.toBase58()}`);
 
+  // Only the program's upgrade authority may initialize (enforced on-chain).
+  const [programData] = PublicKey.findProgramAddressSync(
+    [program.programId.toBuffer()], new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111"));
   const sig = await program.methods
     .initialize(SPL_STAKE_POOL, SPL_POOL_MINT)
-    .accounts({
+    .accountsStrict({
       config,
       reserve,
-      splPool: SPL_STAKE_POOL,
+      program: program.programId,
+      programData,
       admin: keypair.publicKey,
       systemProgram: SystemProgram.programId,
     })
     .rpc();
+  // Next: create the reserve's pXNT ATA (X1 ATA program), then run update_share_price —
+  // minting is blocked (PriceStale) until the first price update.
 
   console.log(`\n✓ Protocol initialized. Tx: ${sig}`);
   console.log(`  Config:  ${config.toBase58()}`);

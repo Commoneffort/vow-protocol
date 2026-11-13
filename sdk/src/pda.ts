@@ -47,7 +47,7 @@ export function findVowState(assetId: PublicKey): [PublicKey, number] {
 }
 
 /** @deprecated Use findVowState */
-export const findXNftState = findVowState;
+export const findIdNftState = findVowState;
 
 export function findSessionAccount(
   vowState: PublicKey,
@@ -85,11 +85,51 @@ export function findUnstakeEscrow(vowState: PublicKey): [PublicKey, number] {
   );
 }
 
+/** One per wallet — `["owner_index", owner]`; its vow_state is the canonical identity. */
+export function findOwnerIndex(owner: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("owner_index"), owner.toBuffer()],
+    PROGRAM_ID
+  );
+}
+
 export function findCommitmentRecord(wallet: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("commitment"), wallet.toBuffer()],
     PROGRAM_ID
   );
+}
+
+/** X1 mainnet SPL Stake Pool program (different address from standard Solana) */
+export const SPL_STAKE_POOL_PROGRAM_ID = new PublicKey("XPoo1Fx6KNgeAzFcq2dPTo95bWGUSj5KdPVqYj9CZux");
+
+const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+// X1 deploys the associated token program at a different address than standard Solana
+export const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+
+/**
+ * ATA owned by the reserve PDA that holds pXNT pool tokens.
+ * On testnet (pool not configured), this account won't exist.
+ */
+export function findReservePoolTokens(pXNTMint: PublicKey): PublicKey {
+  const [reserve] = findReserve();
+  const [ata] = PublicKey.findProgramAddressSync(
+    [reserve.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), pXNTMint.toBuffer()],
+    ASSOCIATED_TOKEN_PROGRAM_ID
+  );
+  return ata;
+}
+
+/**
+ * Derives the SPL stake pool withdraw authority PDA.
+ * Needed as an account in flush_reserve_to_pool and withdraw_from_pool.
+ */
+export function findPoolWithdrawAuthority(poolAddress: PublicKey): PublicKey {
+  const [auth] = PublicKey.findProgramAddressSync(
+    [poolAddress.toBuffer(), Buffer.from("withdraw")],
+    SPL_STAKE_POOL_PROGRAM_ID
+  );
+  return auth;
 }
 
 export { PROGRAM_ID };

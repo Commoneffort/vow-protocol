@@ -62,24 +62,17 @@ pub fn handler(ctx: Context<CompleteUnstake>) -> Result<()> {
     let lamports_owed = escrow.lamports_owed;
     let asset_id = ctx.accounts.vow_state.asset_id;
     let reserve_bump = ctx.accounts.config.reserve_bump;
-    let total_pending = ctx.accounts.config.total_pending_unstake;
-
+    // Always pay exactly what was locked in at begin_unstake. The reserve is
+    // illiquid (SOL in the pool), never insolvent: if it can't pay right now, revert
+    // and let the caller run withdraw_from_pool first. The old pro-rata branch paid a
+    // partial amount, closed the escrow and silently forfeited the remainder.
+    let rent_exempt = Rent::get()?.minimum_balance(0);
     let reserve_lamports = ctx.accounts.reserve.lamports();
-    require!(reserve_lamports > 0, VowError::InsufficientYieldBalance);
-
-    // Pro-rata: if the reserve can cover all pending claims, pay in full.
-    // If reserve is short, each unstaker gets their proportional share.
-    let pay_amount = if total_pending == 0 || reserve_lamports >= total_pending {
-        lamports_owed
-    } else {
-        ((lamports_owed as u128)
-            .checked_mul(reserve_lamports as u128)
-            .unwrap_or(0)
-            .checked_div(total_pending as u128)
-            .unwrap_or(0)) as u64
-    };
-
-    require!(pay_amount > 0, VowError::InsufficientYieldBalance);
+    require!(
+        reserve_lamports >= lamports_owed.saturating_add(rent_exempt),
+        VowError::ReserveIlliquid
+    );
+    let pay_amount = lamports_owed;
 
     let reserve_seeds: &[&[u8]] = &[b"reserve", &[reserve_bump]];
 

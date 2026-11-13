@@ -74,4 +74,14 @@ pub enum VowError {
     ReserveSufficient,
     #[msg("Share price not yet synced from pool — call update_share_price before minting")]
     SharePriceNotSynced,
+    #[msg("Whitelisted session spend must be signed by the calling program's vow_caller PDA (CPI only)")]
+    CallerNotAuthorized,
+    #[msg("Share price is stale for this epoch — call update_share_price first (same transaction is fine)")]
+    PriceStale,
+    #[msg("Reserve lacks liquid SOL for this payout — call withdraw_from_pool first")]
+    ReserveIlliquid,
+    #[msg("Pool token account must be the reserve's canonical pXNT associated token account")]
+    InvalidPoolTokenAccount,
+    #[msg("Stake pool configuration not supported (SOL deposit/withdraw authority set)")]
+    UnsupportedPoolConfig,
 }

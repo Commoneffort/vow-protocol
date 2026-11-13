@@ -12,7 +12,17 @@ pub struct ProtocolConfig {
 
     // Mint counter — nonce for asset_id PDA derivation
     pub total_minted: u64,
-    pub merkle_tree: Pubkey, // reserved for future spl-account-compression upgrade
+    // ── Price freshness + pool fees (occupies the 32 bytes formerly reserved as
+    //    `merkle_tree`, which was always Pubkey::default() — so after upgrade these
+    //    read as 0, i.e. "stale", until the first update_share_price). ──
+    /// Pool `last_update_epoch` observed by the last update_share_price. Value-moving
+    /// instructions require this to be >= the current epoch (see `require_fresh_price`).
+    pub price_epoch: u64,
+    /// Pool SOL deposit fee, parts-per-million (rounded up).
+    pub deposit_fee_ppm: u32,
+    /// Pool SOL withdrawal fee, parts-per-million (rounded up; max of current/scheduled).
+    pub withdrawal_fee_ppm: u32,
+    pub _reserved: [u8; 16],
 
     // Running total of all active unstake escrow lamports_owed — used for pro-rata payout
     pub total_pending_unstake: u64,
@@ -35,7 +45,7 @@ impl ProtocolConfig {
         + 8   // total_yield_claims
         + 8   // last_pool_lamports
         + 8   // total_minted
-        + 32  // merkle_tree
+        + 8 + 4 + 4 + 16  // price_epoch, deposit_fee_ppm, withdrawal_fee_ppm, _reserved
         + 8   // total_pending_unstake
         + 32  // spl_stake_pool
         + 32  // spl_pool_mint

@@ -14,8 +14,9 @@ pub struct SetAdmin<'info> {
 
     pub admin: Signer<'info>,
 
-    /// CHECK: new admin pubkey — just a public key, no account validation needed
-    pub new_admin: UncheckedAccount<'info>,
+    /// The new admin must co-sign, proving the key exists and is controlled —
+    /// prevents handing admin to a typo'd or unowned address.
+    pub new_admin: Signer<'info>,
 }
 
 pub fn handler(ctx: Context<SetAdmin>) -> Result<()> {

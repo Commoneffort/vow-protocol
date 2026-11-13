@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use crate::constants::SHARE_PRECISION;
 use crate::errors::VowError;
 use crate::events::ProtocolInitialized;
+use crate::program::Vow;
 use crate::state::ProtocolConfig;
 
 #[derive(Accounts)]
@@ -23,10 +24,17 @@ pub struct Initialize<'info> {
     )]
     pub reserve: UncheckedAccount<'info>,
 
-    /// X1 Foundation SPL stake pool — read at init to set the correct opening share price.
-    /// On testnet pass SystemProgram.programId (no-op: price stays at SHARE_PRECISION).
-    /// CHECK: key verified against spl_stake_pool param in handler; data parsed at fixed offsets.
-    pub spl_pool: UncheckedAccount<'info>,
+    /// Only the program's upgrade authority may initialize. Without this, whoever
+    /// called `initialize` first (on a fresh deploy) would become admin.
+    #[account(
+        constraint = program.programdata_address()? == Some(program_data.key()) @ VowError::Unauthorized,
+    )]
+    pub program: Program<'info, Vow>,
+
+    #[account(
+        constraint = program_data.upgrade_authority_address == Some(admin.key()) @ VowError::Unauthorized,
+    )]
+    pub program_data: Account<'info, ProgramData>,
 
     #[account(mut)]
     pub admin: Signer<'info>,
@@ -41,49 +49,23 @@ pub fn handler(
 ) -> Result<()> {
     let config = &mut ctx.accounts.config;
     config.admin = ctx.accounts.admin.key();
+    config.current_share_price = SHARE_PRECISION;
     config.total_shares = 0;
     config.total_yield_claims = 0;
     config.last_pool_lamports = 0;
     config.total_minted = 0;
-    config.merkle_tree = Pubkey::default();
+    // price_epoch = 0 → stale: minting is blocked until the first update_share_price,
+    // which sets the opening price from the pool (see pool_math::nav_share_price).
+    config.price_epoch = 0;
+    config.deposit_fee_ppm = 0;
+    config.withdrawal_fee_ppm = 0;
+    config._reserved = [0u8; 16];
     config.total_pending_unstake = 0;
     config.spl_stake_pool = spl_stake_pool;
     config.spl_pool_mint = spl_pool_mint;
     config.reserve_bump = ctx.bumps.reserve;
     config.bump = ctx.bumps.config;
 
-    // Read the pool's actual pXNT/XNT ratio and use it as the opening share price.
-    // Prevents all identities minted after init from inheriting a stale 1.0e12 baseline
-    // when the pool is already at a different rate.
-    // On testnet spl_stake_pool == SystemProgram.programId → skip, keep SHARE_PRECISION.
-    if spl_stake_pool != Pubkey::default()
-        && ctx.accounts.spl_pool.key() == spl_stake_pool
-    {
-        let data = ctx.accounts.spl_pool.try_borrow_data()?;
-        if data.len() >= 275 {
-            let total_lamports = u64::from_le_bytes(data[259..267].try_into().unwrap());
-            let pool_token_supply = u64::from_le_bytes(data[267..275].try_into().unwrap());
-            if total_lamports > 0 && pool_token_supply > 0 {
-                config.current_share_price = (total_lamports as u128)
-                    .checked_mul(SHARE_PRECISION)
-                    .ok_or(VowError::SharePriceOverflow)?
-                    .checked_div(pool_token_supply as u128)
-                    .unwrap_or(SHARE_PRECISION);
-                config.last_pool_lamports = total_lamports;
-            } else {
-                config.current_share_price = SHARE_PRECISION;
-            }
-        } else {
-            config.current_share_price = SHARE_PRECISION;
-        }
-    } else {
-        config.current_share_price = SHARE_PRECISION;
-    }
-
-    emit!(ProtocolInitialized {
-        admin: config.admin,
-        merkle_tree: config.merkle_tree,
-    });
-
+    emit!(ProtocolInitialized { admin: config.admin });
     Ok(())
 }

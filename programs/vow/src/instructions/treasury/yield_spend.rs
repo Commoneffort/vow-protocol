@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use crate::constants::VOW_CALLER_SEED;
 use crate::errors::VowError;
 use crate::events::YieldSpent;
 use crate::state::{AppRegistry, VowState, ProtocolConfig, SessionAccount};
@@ -31,14 +32,17 @@ pub struct YieldSpend<'info> {
     /// CHECK: verified to be executable and in the session's allowed_program_ids list
     pub calling_program: UncheckedAccount<'info>,
 
-    /// Optional: app registry entry for the calling program.
-    /// C-1 fix: seeds enforced at instruction level — caller must pass the registry
-    /// for `calling_program`, not a different program's.
+    /// Canonical app registry PDA for `calling_program`. Always required, but may be
+    /// uninitialized (app never registered). Previously this was `Option<…>`, which let
+    /// a caller pass `None` and skip the `blocked` check entirely — `block_app` had no
+    /// teeth. The seed constraint pins it to calling_program; the handler deserializes
+    /// it only when it is initialized and owned by this program.
+    /// CHECK: address pinned by seeds; ownership + discriminator checked in handler
     #[account(
         seeds = [b"app", calling_program.key().as_ref()],
         bump,
     )]
-    pub app_registry: Option<Account<'info, AppRegistry>>,
+    pub app_registry: UncheckedAccount<'info>,
 
     /// Reserve PDA — source of yield lamports
     /// CHECK: PDA validated by seeds + bump from config
@@ -58,6 +62,18 @@ pub struct YieldSpend<'info> {
     pub session_signer: Signer<'info>,
 
     pub system_program: Program<'info, System>,
+
+    /// Proof that `calling_program` itself authorized this spend: the PDA
+    /// `[VOW_CALLER_SEED]` derived under `calling_program`, which must be a signer.
+    /// Only `calling_program` can produce that signature (via `invoke_signed`), so this
+    /// proves the spend arrived by CPI from the whitelisted app — not from a session-key
+    /// holder who merely *named* a whitelisted program and picked their own destination.
+    ///
+    /// Required when the session has a program whitelist (`program_count > 0`).
+    /// Ignored for unrestricted sessions (`program_count == 0`), where the owner has
+    /// explicitly allowed the session key to pay any destination.
+    /// CHECK: address derived and signer flag checked in handler
+    pub caller_authority: Option<UncheckedAccount<'info>>,
 }
 
 pub fn handler(ctx: Context<YieldSpend>, amount: u64) -> Result<()> {
@@ -98,10 +114,31 @@ pub fn handler(ctx: Context<YieldSpend>, amount: u64) -> Result<()> {
             allowed.contains(&calling_program_id),
             VowError::ProgramNotAllowed
         );
+
+        // Whitelist is only meaningful if the whitelisted program actually made the call.
+        // Without this, the session key could name any whitelisted program as
+        // `calling_program` and route funds to an arbitrary `destination`.
+        let caller_authority = ctx
+            .accounts
+            .caller_authority
+            .as_ref()
+            .ok_or(VowError::CallerNotAuthorized)?;
+        let (expected_authority, _) =
+            Pubkey::find_program_address(&[VOW_CALLER_SEED], &calling_program_id);
+        require_keys_eq!(
+            caller_authority.key(),
+            expected_authority,
+            VowError::CallerNotAuthorized
+        );
+        require!(caller_authority.is_signer, VowError::CallerNotAuthorized);
     }
 
-    // C-1 fix: app_registry seed constraint ensures the registry belongs to calling_program.
-    if let Some(reg) = &ctx.accounts.app_registry {
+    // Blocked apps can never receive spends. The registry address is pinned by seeds,
+    // so the caller cannot substitute a different (unblocked) registry or omit it.
+    let registry_info = ctx.accounts.app_registry.to_account_info();
+    if registry_info.owner == ctx.program_id && !registry_info.data_is_empty() {
+        let data = registry_info.try_borrow_data()?;
+        let reg = AppRegistry::try_deserialize(&mut &data[..])?;
         require!(!reg.blocked, VowError::AppBlocked);
     }
 
@@ -127,7 +164,13 @@ pub fn handler(ctx: Context<YieldSpend>, amount: u64) -> Result<()> {
     }
 
     require!(idnft.yield_balance >= amount, VowError::InsufficientYieldBalance);
-    require!(ctx.accounts.reserve.lamports() >= amount, VowError::InsufficientYieldBalance);
+    // yield_balance is kept liquid by flush/withdraw_from_pool; the rent floor must
+    // stay or the system transfer out of the reserve fails.
+    let rent_exempt = Rent::get()?.minimum_balance(0);
+    require!(
+        ctx.accounts.reserve.lamports() >= amount.saturating_add(rent_exempt),
+        VowError::ReserveIlliquid
+    );
 
     idnft.yield_balance -= amount;
     let config = &mut ctx.accounts.config;

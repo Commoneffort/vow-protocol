@@ -53,7 +53,9 @@ fn compute_score(r: &CommitmentRecord) -> u32 {
     let class_points = r.highest_class_ever as u32 * 100;
     let mint_points = r.total_xnfts_minted.min(50) * 10;
     let fulfilled_ratio = if r.total_xnt_committed > 0 {
-        (r.total_xnt_fulfilled as u64 * 100 / r.total_xnt_committed) as u32
+        // Capped at 100%: fulfilled principal can never exceed what was committed.
+        (r.total_xnt_fulfilled.min(r.total_xnt_committed) as u128 * 100
+            / r.total_xnt_committed as u128) as u32
     } else {
         0
     };

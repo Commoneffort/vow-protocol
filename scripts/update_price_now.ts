@@ -4,7 +4,7 @@ import * as fs from "fs";
 import idl from "../target/idl/vow.json";
 
 const connection = new Connection("https://rpc.mainnet.x1.xyz", "confirmed");
-const kp = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(fs.readFileSync(process.env.HOME + "/.config/solana/id.json", "utf-8"))));
+const kp = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(fs.readFileSync(process.env.HOME + "/.config/solana/vow-key.json", "utf-8"))));
 const provider = new AnchorProvider(connection, new Wallet(kp), { commitment: "confirmed" });
 const program = new Program(idl as any, provider);
 
@@ -16,7 +16,14 @@ async function main() {
   console.log("old current_share_price:", oldPrice, `(${Number(oldPrice) / 1e12})`);
 
   console.log("Calling update_share_price...");
-  const sig = await program.methods.updateSharePrice().accounts({ config, splPool }).rpc();
+  const TOKEN_PROGRAM = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+  const ATA_PROGRAM = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+  const [reserve] = PublicKey.findProgramAddressSync([Buffer.from("reserve")], program.programId);
+  const [reservePoolTokens] = PublicKey.findProgramAddressSync(
+    [reserve.toBuffer(), TOKEN_PROGRAM.toBuffer(), (configData as any).splPoolMint.toBuffer()], ATA_PROGRAM);
+  const sig = await program.methods.updateSharePrice()
+    .accountsStrict({ config, splPool, reserve, reservePoolTokens, tokenProgram: TOKEN_PROGRAM })
+    .rpc();
   console.log("Sig:", sig);
 
   const updated = await (program.account as any).protocolConfig.fetch(config);

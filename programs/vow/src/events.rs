@@ -3,7 +3,6 @@ use anchor_lang::prelude::*;
 #[event]
 pub struct ProtocolInitialized {
     pub admin: Pubkey,
-    pub merkle_tree: Pubkey,
 }
 
 #[event]

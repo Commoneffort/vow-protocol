@@ -42,7 +42,11 @@ pub fn handler(ctx: Context<WithdrawYield>, amount: Option<u64>) -> Result<()> {
 
     require!(idnft.yield_balance >= withdraw_amount, VowError::InsufficientYieldBalance);
     require!(withdraw_amount > 0, VowError::InsufficientYieldBalance);
-    require!(ctx.accounts.reserve.lamports() >= withdraw_amount, VowError::InsufficientYieldBalance);
+    let rent_exempt = Rent::get()?.minimum_balance(0);
+    require!(
+        ctx.accounts.reserve.lamports() >= withdraw_amount.saturating_add(rent_exempt),
+        VowError::ReserveIlliquid
+    );
 
     idnft.yield_balance -= withdraw_amount;
     ctx.accounts.config.total_yield_claims =

@@ -5,13 +5,18 @@ use anchor_lang::solana_program::{
     pubkey::Pubkey as SolanaPubkey,
 };
 use anchor_spl::token::{Mint, Token, TokenAccount};
+
 use crate::constants::SPL_STAKE_POOL_PROGRAM_ID;
 use crate::errors::VowError;
+use crate::pool_math::{parse_pool, require_canonical_pool_ata, required_liquidity};
 use crate::state::ProtocolConfig;
 
-/// Permissionless crank. Deposits all reserve SOL (minus rent-exempt minimum) into the
-/// X1 Foundation SPL stake pool. The reserve receives pXNT pool tokens in exchange.
-/// This is what actually earns yield — the pXNT appreciates as validators earn rewards.
+/// Permissionless crank. Deposits only the reserve SOL that is NOT already owed to
+/// someone into the X1 Foundation SPL stake pool, in exchange for pXNT.
+///
+/// The reserve always keeps `rent + total_yield_claims + total_pending_unstake`
+/// liquid, so yield_balance stays spendable (yield_spend / withdraw_yield) and
+/// pending unstakes stay payable no matter who calls this or when.
 ///
 /// No-op on testnet (spl_stake_pool not configured).
 ///
@@ -30,8 +35,8 @@ pub struct FlushReserveToPool<'info> {
     #[account(mut, seeds = [b"reserve"], bump = config.reserve_bump)]
     pub reserve: UncheckedAccount<'info>,
 
-    /// Reserve's ATA for pXNT — must be pre-created (X1 uses a non-standard ATA program;
-    /// frontend calls ensureReserveAta() before the first flush).
+    /// Reserve's canonical pXNT ATA (address pinned in handler) — must be pre-created
+    /// (X1 uses a non-standard ATA program; frontend calls ensureReserveAta()).
     #[account(
         mut,
         token::mint = pool_mint,
@@ -49,19 +54,20 @@ pub struct FlushReserveToPool<'info> {
     #[account(mut)]
     pub pool_withdraw_authority: UncheckedAccount<'info>,
 
-    /// Pool's reserve stake account — read from pool account data at offset 131
+    /// Pool's reserve stake account
     /// CHECK: verified in handler against pool data
     #[account(mut)]
     pub pool_reserve_stake: UncheckedAccount<'info>,
 
-    /// Pool manager fee account — read from pool account data at offset 195
+    /// Pool manager fee account
     /// CHECK: verified in handler against pool data
     #[account(mut)]
     pub pool_manager_fee_account: UncheckedAccount<'info>,
 
-    /// Referral fee destination — pass same as manager_fee if no referral program
-    /// CHECK: passed through to stake pool program
-    #[account(mut)]
+    /// Referral fee destination — pinned to our own pXNT ATA so any referral share of
+    /// the deposit fee comes back to the protocol instead of to whoever cranks.
+    /// CHECK: must equal reserve_pool_tokens
+    #[account(mut, address = reserve_pool_tokens.key() @ VowError::InvalidPoolTokenAccount)]
     pub pool_referral_fee_account: UncheckedAccount<'info>,
 
     /// pXNT mint
@@ -71,7 +77,7 @@ pub struct FlushReserveToPool<'info> {
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 
-    /// CHECK: must be the standard SPL stake pool program
+    /// CHECK: must be the X1 SPL stake pool program
     pub stake_pool_program: UncheckedAccount<'info>,
 }
 
@@ -86,27 +92,27 @@ pub fn handler(ctx: Context<FlushReserveToPool>) -> Result<()> {
         ctx.accounts.stake_pool_program.key() == stake_pool_program_id,
         VowError::StakeAccountMismatch
     );
+    require_canonical_pool_ata(
+        &ctx.accounts.reserve_pool_tokens.key(),
+        &ctx.accounts.reserve.key(),
+        &ctx.accounts.token_program.key(),
+        &ctx.accounts.config.spl_pool_mint,
+    )?;
 
-    // Verify pool accounts from pool account data.
-    // X1 StakePool layout (Borsh, no discriminator):
-    //   0: version(1) 1: account_type(1) 2: manager(32) 34: staker(32) 66: stake_deposit_authority(32)
-    //   98: bump(1) 99: validator_list(32) 131: reserve_stake(32) 163: pool_mint(32) 195: manager_fee(32)
-    let pool_data = ctx.accounts.spl_pool.try_borrow_data()?;
-    require!(pool_data.len() >= 227, VowError::InvalidStakeAccount);
-    let reserve_stake_key = Pubkey::new_from_array(pool_data[131..163].try_into().unwrap());
-    let manager_fee_key = Pubkey::new_from_array(pool_data[195..227].try_into().unwrap());
-    drop(pool_data);
-
+    let pool = {
+        let data = ctx.accounts.spl_pool.try_borrow_data()?;
+        parse_pool(&data)?
+    };
+    require!(!pool.has_sol_deposit_authority, VowError::UnsupportedPoolConfig);
     require!(
-        ctx.accounts.pool_reserve_stake.key() == reserve_stake_key,
+        ctx.accounts.pool_reserve_stake.key() == pool.reserve_stake,
         VowError::StakeAccountMismatch
     );
     require!(
-        ctx.accounts.pool_manager_fee_account.key() == manager_fee_key,
+        ctx.accounts.pool_manager_fee_account.key() == pool.manager_fee_account,
         VowError::StakeAccountMismatch
     );
 
-    // Verify pool withdraw authority PDA
     let (expected_withdraw_authority, _) = Pubkey::find_program_address(
         &[ctx.accounts.spl_pool.key().as_ref(), b"withdraw"],
         &stake_pool_program_id,
@@ -116,14 +122,15 @@ pub fn handler(ctx: Context<FlushReserveToPool>) -> Result<()> {
         VowError::StakeAccountMismatch
     );
 
+    // Only SOL above what is owed (yield claims + pending unstakes) and rent is idle.
+    let rent_exempt = Rent::get()?.minimum_balance(0);
+    let keep = required_liquidity(&ctx.accounts.config, rent_exempt);
     let reserve_lamports = ctx.accounts.reserve.lamports();
-    let rent = Rent::get()?;
-    let rent_exempt = rent.minimum_balance(0);
-    if reserve_lamports <= rent_exempt {
+    if reserve_lamports <= keep {
         return Ok(());
     }
+    let deposit_amount = reserve_lamports - keep;
 
-    let deposit_amount = reserve_lamports - rent_exempt;
     let reserve_bump = ctx.accounts.config.reserve_bump;
     let reserve_seeds: &[&[u8]] = &[b"reserve", &[reserve_bump]];
 

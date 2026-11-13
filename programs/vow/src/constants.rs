@@ -37,3 +37,13 @@ pub const UPTIME_EPOCH_THRESHOLD: u8 = 4; // must have credits in last 4 epochs
 
 // Solana native stake account data size
 pub const STAKE_ACCOUNT_SPACE: u64 = 200;
+
+/// Seed for the PDA a dApp program signs with (via invoke_signed) when it CPIs into
+/// yield_spend for a whitelisted session: find_program_address(&[VOW_CALLER_SEED], app_program_id).
+pub const VOW_CALLER_SEED: &[u8] = b"vow_caller";
+
+/// X1's associated token program (differs from the standard Solana ATA program).
+pub const X1_ATA_PROGRAM_ID: &str = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
+
+/// Fee math denominator (parts-per-million).
+pub const PPM: u128 = 1_000_000;

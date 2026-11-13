@@ -1,9 +1,9 @@
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
-use crate::constants::SHARE_PRECISION;
 use crate::errors::VowError;
 use crate::events::StakeAdded;
 use crate::instructions::harvest::settle_idnft;
+use crate::pool_math::shares_for_deposit;
 use crate::state::{ProtocolConfig, VowState, class_for_stake, lock_duration};
 
 #[derive(Accounts)]
@@ -71,23 +71,20 @@ pub fn handler(ctx: Context<AddStake>, lamports_to_add: u64) -> Result<()> {
     let new_class = class_for_stake(new_principal)?;
 
     // Mint new shares at current price for the added lamports only
-    let new_shares = (lamports_to_add as u128)
-        .checked_mul(SHARE_PRECISION)
-        .ok_or(VowError::MathOverflow)?
-        .checked_div(ctx.accounts.config.current_share_price)
-        .ok_or(VowError::MathOverflow)?;
+    // settle_idnft above already required a fresh price.
+    let new_shares = shares_for_deposit(&ctx.accounts.config, lamports_to_add)?;
 
     let clock = Clock::get()?;
     let old_class = idnft.class;
-    let class_upgraded = new_class > old_class;
-
-    if class_upgraded {
-        idnft.unlock_at = clock.unix_timestamp + lock_duration(new_class);
-        idnft.matured = false;
-        idnft.class = new_class;
-        if new_class > idnft.highest_class_ever {
-            idnft.highest_class_ever = new_class;
-        }
+    // Every top-up is a new commitment: the whole position re-locks for the (new)
+    // class duration. Previously only a class upgrade reset the lock, so a top-up
+    // within the same class — or after maturity — could be unstaked immediately and
+    // counted as "fulfilled" principal it never actually committed.
+    idnft.unlock_at = clock.unix_timestamp + lock_duration(new_class);
+    idnft.matured = false;
+    idnft.class = new_class;
+    if new_class > idnft.highest_class_ever {
+        idnft.highest_class_ever = new_class;
     }
 
     idnft.principal_lamports = new_principal;

@@ -1,0 +1,21 @@
+# Test-only CPI caller for yield_spend. NOT a workspace member, so `anchor build` /
+# `anchor deploy` never touch it. Built by tests/run-local-tests.sh.
+[package]
+name = "vow_test_caller"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+anchor-lang = { version = "=0.31.0" }
+
+[workspace]
+
+[patch.crates-io]
+blake3 = { path = "../../../patches/blake3" }
+proc-macro-crate = { path = "../../../patches/proc-macro-crate" }
+hashbrown = { path = "../../../patches/hashbrown" }
+indexmap = { path = "../../../patches/indexmap" }
+unicode-segmentation = { path = "../../../patches/unicode-segmentation" }

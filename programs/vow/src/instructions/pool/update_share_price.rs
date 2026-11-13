@@ -1,17 +1,20 @@
 use anchor_lang::prelude::*;
-use crate::constants::SHARE_PRECISION;
+use anchor_spl::token::{Token, TokenAccount};
+
 use crate::errors::VowError;
 use crate::events::SharePriceUpdated;
+use crate::pool_math::{nav_share_price, parse_pool, require_canonical_pool_ata, NavInputs};
 use crate::state::ProtocolConfig;
 
-/// Permissionless crank. Reads the X1 Foundation SPL stake pool account to
-/// compute the current pXNT/XNT exchange rate and updates the protocol's
-/// share price. No admin interaction needed — the pool's totalLamports and
-/// poolTokenSupply are parsed directly from on-chain account data.
+/// Permissionless crank. Recomputes the share price from the protocol's real,
+/// redeemable assets (NAV — see `pool_math`) rather than the raw pool exchange rate,
+/// so pool fees, surplus and liabilities are reflected and every share is worth an
+/// equal slice of what can actually be paid out.
 ///
-/// X1 StakePool layout (version:u8 at offset 0 shifts all fields +1 vs standard SPL):
-///   offset 259: totalLamports  u64 LE
-///   offset 267: poolTokenSupply u64 LE
+/// Also records the pool's `last_update_epoch` and fees; value-moving instructions
+/// (mint, add_stake, activate_stake, harvest, begin_unstake, update_yield_mode)
+/// require the price to be fresh for the current epoch. Clients should prepend this
+/// instruction to those transactions.
 #[derive(Accounts)]
 pub struct UpdateSharePrice<'info> {
     #[account(
@@ -22,13 +25,24 @@ pub struct UpdateSharePrice<'info> {
     pub config: Account<'info, ProtocolConfig>,
 
     /// The X1 Foundation SPL stake pool account.
-    /// Address is verified against config.spl_stake_pool so the crank
-    /// cannot pass an attacker-controlled account to manipulate the price.
-    /// CHECK: verified against config.spl_stake_pool; data parsed at fixed offsets.
+    /// CHECK: verified against config.spl_stake_pool; data parsed by `parse_pool`.
     #[account(
         address = config.spl_stake_pool @ VowError::StakeAccountMismatch,
     )]
     pub spl_pool: UncheckedAccount<'info>,
+
+    /// CHECK: PDA validated by seeds + bump from config; lamport balance is read
+    #[account(seeds = [b"reserve"], bump = config.reserve_bump)]
+    pub reserve: UncheckedAccount<'info>,
+
+    /// Reserve's canonical pXNT ATA (address pinned in handler).
+    #[account(
+        token::authority = reserve,
+        constraint = reserve_pool_tokens.mint == config.spl_pool_mint @ VowError::InvalidPoolTokenAccount,
+    )]
+    pub reserve_pool_tokens: Account<'info, TokenAccount>,
+
+    pub token_program: Program<'info, Token>,
 }
 
 pub fn handler(ctx: Context<UpdateSharePrice>) -> Result<()> {
@@ -37,37 +51,49 @@ pub fn handler(ctx: Context<UpdateSharePrice>) -> Result<()> {
         return Ok(());
     }
 
-    let data = ctx.accounts.spl_pool.try_borrow_data()?;
+    require_canonical_pool_ata(
+        &ctx.accounts.reserve_pool_tokens.key(),
+        &ctx.accounts.reserve.key(),
+        &ctx.accounts.token_program.key(),
+        &ctx.accounts.config.spl_pool_mint,
+    )?;
 
-    // X1 StakePool layout adds version:u8 at offset 0, shifting all fields by 1.
-    // total_lamports at 259..267, pool_token_supply at 267..275.
-    require!(data.len() >= 275, VowError::InvalidStakeAccount);
+    let pool = {
+        let data = ctx.accounts.spl_pool.try_borrow_data()?;
+        parse_pool(&data)?
+    };
+    require_keys_eq!(pool.pool_mint, ctx.accounts.config.spl_pool_mint, VowError::StakeAccountMismatch);
+    if pool.pool_token_supply == 0 || pool.total_lamports == 0 {
+        return Ok(());
+    }
 
-    let total_lamports = u64::from_le_bytes(data[259..267].try_into().unwrap());
-    let pool_token_supply = u64::from_le_bytes(data[267..275].try_into().unwrap());
-
+    let rent_exempt = Rent::get()?.minimum_balance(0);
     let config = &mut ctx.accounts.config;
     let old_price = config.current_share_price;
 
-    if pool_token_supply > 0 {
-        // price = totalLamports * SHARE_PRECISION / poolTokenSupply
-        // Allows price to decrease (slashing) as well as increase (rewards).
-        // Floor at 1 so division is always safe.
-        let new_price = (total_lamports as u128)
-            .checked_mul(SHARE_PRECISION)
-            .ok_or(VowError::SharePriceOverflow)?
-            .checked_div(pool_token_supply as u128)
-            .unwrap_or(1)
-            .max(1);
-        config.current_share_price = new_price;
-    }
+    let new_price = nav_share_price(&NavInputs {
+        reserve_lamports: ctx.accounts.reserve.lamports(),
+        rent_exempt,
+        total_yield_claims: config.total_yield_claims,
+        total_pending_unstake: config.total_pending_unstake,
+        pxnt_amount: ctx.accounts.reserve_pool_tokens.amount,
+        pool_total_lamports: pool.total_lamports,
+        pool_token_supply: pool.pool_token_supply,
+        deposit_fee_ppm: pool.deposit_fee_ppm,
+        withdrawal_fee_ppm: pool.withdrawal_fee_ppm,
+        total_shares: config.total_shares,
+    })?;
 
-    config.last_pool_lamports = total_lamports;
+    config.current_share_price = new_price;
+    config.last_pool_lamports = pool.total_lamports;
+    config.price_epoch = pool.last_update_epoch;
+    config.deposit_fee_ppm = pool.deposit_fee_ppm;
+    config.withdrawal_fee_ppm = pool.withdrawal_fee_ppm;
 
     emit!(SharePriceUpdated {
         old_price,
-        new_price: config.current_share_price,
-        pool_lamports: total_lamports,
+        new_price,
+        pool_lamports: pool.total_lamports,
         total_shares: config.total_shares,
     });
 

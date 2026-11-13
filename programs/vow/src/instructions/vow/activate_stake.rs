@@ -1,9 +1,9 @@
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
-use crate::constants::*;
 use crate::errors::VowError;
 use crate::events::VowStakeActivated;
 use crate::instructions::harvest::settle_idnft;
+use crate::pool_math::shares_for_deposit;
 use crate::state::{VowState, ProtocolConfig, YieldMode, class_for_stake, lock_duration};
 
 #[derive(Accounts)]
@@ -63,11 +63,8 @@ pub fn handler(
     )?;
 
     let config_ref = &ctx.accounts.config;
-    let new_shares = (stake_lamports as u128)
-        .checked_mul(SHARE_PRECISION)
-        .ok_or(VowError::MathOverflow)?
-        .checked_div(config_ref.current_share_price)
-        .ok_or(VowError::MathOverflow)?;
+    // settle_idnft above already required a fresh price.
+    let new_shares = shares_for_deposit(config_ref, stake_lamports)?;
 
     let unlock_at = clock.unix_timestamp + lock_duration(new_class);
 

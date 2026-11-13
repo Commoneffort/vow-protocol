@@ -1,7 +1,7 @@
 {
-  "name": "@x1/xnft-sdk",
+  "name": "@vow/sdk",
   "version": "0.1.0",
-  "description": "TypeScript SDK for the xNFT Protocol on X1 Network",
+  "description": "TypeScript SDK for Vow Protocol on X1 (synced from frontend/src/sdk by scripts/sync-idl.sh)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

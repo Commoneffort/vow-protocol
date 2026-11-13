@@ -1,9 +1,9 @@
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
-use crate::constants::*;
 use crate::errors::VowError;
 use crate::events::VowMinted;
-use crate::state::{ProtocolConfig, VowState, YieldMode, class_for_stake, lock_duration};
+use crate::pool_math::{require_fresh_price, shares_for_deposit};
+use crate::state::{OwnerIndex, ProtocolConfig, VowState, YieldMode, class_for_stake, lock_duration};
 
 #[derive(Accounts)]
 pub struct MintVow<'info> {
@@ -40,6 +40,16 @@ pub struct MintVow<'info> {
     )]
     pub reserve: UncheckedAccount<'info>,
 
+    /// One identity per wallet: `init` fails if this wallet already has one.
+    #[account(
+        init,
+        payer = owner,
+        space = OwnerIndex::LEN,
+        seeds = [b"owner_index", owner.key().as_ref()],
+        bump,
+    )]
+    pub owner_index: Account<'info, OwnerIndex>,
+
     #[account(mut)]
     pub owner: Signer<'info>,
 
@@ -53,15 +63,8 @@ pub fn handler(
 ) -> Result<()> {
     let class = class_for_stake(stake_lamports)?;
 
-    // Block minting if a real pool is configured but the share price has never been
-    // read from it. last_pool_lamports stays 0 until the first update_share_price
-    // succeeds, so this catches the window between initialize and the first sync.
-    if ctx.accounts.config.spl_stake_pool != Pubkey::default() {
-        require!(
-            ctx.accounts.config.last_pool_lamports > 0,
-            VowError::SharePriceNotSynced
-        );
-    }
+    // Price must reflect this epoch's pool state (also covers "never synced").
+    require_fresh_price(&ctx.accounts.config)?;
 
     let clock = Clock::get()?;
     let asset_id = ctx.accounts.asset_id_account.key();
@@ -83,11 +86,9 @@ pub fn handler(
     // gives shares == stake_lamports (the initial 1:1 case). Using total_shares==0 as a special
     // case would give the first minter inflated shares if the price already appreciated from
     // a previous pool cycle where all positions were eventually unstaked.
-    let shares = (stake_lamports as u128)
-        .checked_mul(SHARE_PRECISION)
-        .ok_or(VowError::MathOverflow)?
-        .checked_div(config_ref.current_share_price)
-        .ok_or(VowError::MathOverflow)?;
+    // Shares are minted against the deposit's value net of the pool round-trip
+    // fees it will incur, so existing holders never subsidize a newcomer's fees.
+    let shares = shares_for_deposit(config_ref, stake_lamports)?;
 
     let unlock_at = clock.unix_timestamp + lock_duration(class);
     let nonce = ctx.accounts.config.total_minted;
@@ -111,6 +112,12 @@ pub fn handler(
     idnft.session_nonce = 0;
     idnft.nonce = nonce;
     idnft.bump = ctx.bumps.vow_state;
+
+    let index = &mut ctx.accounts.owner_index;
+    index.owner = ctx.accounts.owner.key();
+    index.vow_state = ctx.accounts.vow_state.key();
+    index.bump = ctx.bumps.owner_index;
+    let idnft = &mut ctx.accounts.vow_state;
 
     idnft.first_staked_at = clock.unix_timestamp;
     idnft.current_stake_started_at = clock.unix_timestamp;

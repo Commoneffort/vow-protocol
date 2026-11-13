@@ -1,10 +1,12 @@
 # Rust / Anchor build artifacts
-target/
+target/*
 .anchor/
 
 # Keep generated IDL and TypeScript types for integrators
-!target/idl/
-!target/types/
+!target/idl
+!target/idl/**
+!target/types
+!target/types/**
 
 # Node
 node_modules/
@@ -31,3 +33,10 @@ id.json
 .DS_Store
 *.log
 yarn-error.log
+
+# Secrets
+.env
+.env.*
+
+# Test-only CPI fixture build output
+tests/fixtures/*/target/

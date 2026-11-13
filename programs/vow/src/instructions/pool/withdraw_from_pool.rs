@@ -5,21 +5,22 @@ use anchor_lang::solana_program::{
     pubkey::Pubkey as SolanaPubkey,
 };
 use anchor_spl::token::{Mint, Token, TokenAccount};
-use crate::constants::SPL_STAKE_POOL_PROGRAM_ID;
-use crate::errors::VowError;
-use crate::state::{ProtocolConfig, UnstakeEscrow};
 
-/// Permissionless crank — but only callable when the reserve's SOL balance is
-/// genuinely insufficient to cover a specific pending unstake payout.
+use crate::constants::{PPM, SPL_STAKE_POOL_PROGRAM_ID};
+use crate::errors::VowError;
+use crate::pool_math::{parse_pool, require_canonical_pool_ata, required_liquidity};
+use crate::state::ProtocolConfig;
+
+/// Permissionless crank — callable only when the reserve's liquid SOL is below what
+/// the protocol owes right now (`rent + total_yield_claims + total_pending_unstake`).
 ///
-/// Redeems just enough pXNT from the X1 Foundation SPL stake pool to cover
-/// `unstake_escrow.lamports_owed`. Reverts if the reserve already has enough SOL,
-/// preventing anyone from gratuitously draining the pXNT position.
+/// Redeems just enough pXNT (grossed up for the pool's withdrawal fee) to close that
+/// shortfall. Reverts with `ReserveSufficient` otherwise, so nobody can gratuitously
+/// pull the protocol's position out of the pool.
 ///
-/// Intended call sequence before complete_unstake:
-///   1. Check reserve.lamports() < escrow.lamports_owed client-side
-///   2. If short, call withdraw_from_pool (passes this escrow as proof of need)
-///   3. Call complete_unstake
+/// Covers every fixed obligation — not just unstakes — so harvested / deposited
+/// yield_balance is always spendable. If one call leaves a residual shortfall (pool
+/// rounding), call it again.
 ///
 /// SPL stake pool WithdrawSol instruction (tag=16):
 ///   accounts: [pool(mut), withdraw_authority(ro), user_transfer_authority(signer),
@@ -37,15 +38,7 @@ pub struct WithdrawFromPool<'info> {
     #[account(mut, seeds = [b"reserve"], bump = config.reserve_bump)]
     pub reserve: UncheckedAccount<'info>,
 
-    /// The pending unstake that justifies this withdrawal.
-    /// Proves there is a real payout that the reserve cannot currently cover.
-    #[account(
-        seeds = [b"unstake", unstake_escrow.vow_state.as_ref()],
-        bump = unstake_escrow.bump,
-    )]
-    pub unstake_escrow: Account<'info, UnstakeEscrow>,
-
-    /// Reserve's pXNT token account — tokens to burn
+    /// Reserve's canonical pXNT ATA — tokens to burn (address pinned in handler)
     #[account(
         mut,
         token::mint = pool_mint,
@@ -62,12 +55,12 @@ pub struct WithdrawFromPool<'info> {
     /// CHECK: verified in handler
     pub pool_withdraw_authority: UncheckedAccount<'info>,
 
-    /// Pool's reserve stake account — read from pool data at offset 131
+    /// Pool's reserve stake account
     /// CHECK: verified in handler against pool data
     #[account(mut)]
     pub pool_reserve_stake: UncheckedAccount<'info>,
 
-    /// Pool manager fee account — read from pool data at offset 195
+    /// Pool manager fee account
     /// CHECK: verified in handler against pool data
     #[account(mut)]
     pub pool_manager_fee_account: UncheckedAccount<'info>,
@@ -99,12 +92,12 @@ pub fn handler(ctx: Context<WithdrawFromPool>) -> Result<()> {
         return Ok(());
     }
 
-    // Guard: only callable when reserve genuinely cannot cover this escrow's payout.
+    // Guard: only callable when the reserve can't cover what is owed right now.
+    let rent_exempt = Rent::get()?.minimum_balance(0);
+    let required = required_liquidity(&ctx.accounts.config, rent_exempt);
     let reserve_lamports = ctx.accounts.reserve.lamports();
-    let lamports_owed = ctx.accounts.unstake_escrow.lamports_owed;
-    require!(reserve_lamports < lamports_owed, VowError::ReserveSufficient);
-
-    let lamports_needed = lamports_owed - reserve_lamports;
+    require!(reserve_lamports < required, VowError::ReserveSufficient);
+    let shortfall = required - reserve_lamports;
 
     let stake_pool_program_id = SolanaPubkey::try_from(SPL_STAKE_POOL_PROGRAM_ID)
         .map_err(|_| error!(VowError::StakeAccountMismatch))?;
@@ -112,29 +105,26 @@ pub fn handler(ctx: Context<WithdrawFromPool>) -> Result<()> {
         ctx.accounts.stake_pool_program.key() == stake_pool_program_id,
         VowError::StakeAccountMismatch
     );
+    require_canonical_pool_ata(
+        &ctx.accounts.reserve_pool_tokens.key(),
+        &ctx.accounts.reserve.key(),
+        &ctx.accounts.token_program.key(),
+        &ctx.accounts.config.spl_pool_mint,
+    )?;
 
-    // Verify and read pool account data.
-    // X1 StakePool layout (Borsh, no discriminator):
-    //   0: version(1) 1: account_type(1) 2: manager(32) 34: staker(32) 66: stake_deposit_authority(32)
-    //   98: bump(1) 99: validator_list(32) 131: reserve_stake(32) 163: pool_mint(32) 195: manager_fee(32)
-    //   227: token_program_id(32) 259: total_lamports(8) 267: pool_token_supply(8)
-    let pool_data = ctx.accounts.spl_pool.try_borrow_data()?;
-    require!(pool_data.len() >= 275, VowError::InvalidStakeAccount);
-    let reserve_stake_key = Pubkey::new_from_array(pool_data[131..163].try_into().unwrap());
-    let manager_fee_key = Pubkey::new_from_array(pool_data[195..227].try_into().unwrap());
-    let total_lamports = u64::from_le_bytes(pool_data[259..267].try_into().unwrap());
-    let pool_token_supply = u64::from_le_bytes(pool_data[267..275].try_into().unwrap());
-    drop(pool_data);
-
+    let pool = {
+        let data = ctx.accounts.spl_pool.try_borrow_data()?;
+        parse_pool(&data)?
+    };
+    require!(!pool.has_sol_withdraw_authority, VowError::UnsupportedPoolConfig);
     require!(
-        ctx.accounts.pool_reserve_stake.key() == reserve_stake_key,
+        ctx.accounts.pool_reserve_stake.key() == pool.reserve_stake,
         VowError::StakeAccountMismatch
     );
     require!(
-        ctx.accounts.pool_manager_fee_account.key() == manager_fee_key,
+        ctx.accounts.pool_manager_fee_account.key() == pool.manager_fee_account,
         VowError::StakeAccountMismatch
     );
-
     let (expected_withdraw_authority, _) = Pubkey::find_program_address(
         &[ctx.accounts.spl_pool.key().as_ref(), b"withdraw"],
         &stake_pool_program_id,
@@ -143,19 +133,21 @@ pub fn handler(ctx: Context<WithdrawFromPool>) -> Result<()> {
         ctx.accounts.pool_withdraw_authority.key() == expected_withdraw_authority,
         VowError::StakeAccountMismatch
     );
+    require!(pool.pool_token_supply > 0 && pool.total_lamports > 0, VowError::EmptyReserve);
 
-    require!(pool_token_supply > 0 && total_lamports > 0, VowError::EmptyReserve);
-
-    // Ceiling division: burn enough tokens to receive at least lamports_needed
-    let tokens_to_burn = (lamports_needed as u128)
-        .checked_mul(pool_token_supply as u128)
+    // Gross up for the withdrawal fee, then convert lamports → pool tokens (ceil).
+    let w = PPM - (pool.withdrawal_fee_ppm as u128).min(PPM - 1);
+    let gross_lamports = ((shortfall as u128) * PPM + w - 1) / w;
+    let tokens = gross_lamports
+        .checked_mul(pool.pool_token_supply as u128)
         .ok_or(VowError::MathOverflow)?
-        .checked_add((total_lamports as u128).saturating_sub(1))
+        .checked_add(pool.total_lamports as u128 - 1)
         .ok_or(VowError::MathOverflow)?
-        .checked_div(total_lamports as u128)
-        .ok_or(VowError::MathOverflow)? as u64;
-
-    let tokens_to_burn = tokens_to_burn.min(ctx.accounts.reserve_pool_tokens.amount);
+        / pool.total_lamports as u128;
+    // +1 token absorbs the pool's own fee rounding so one call normally suffices.
+    let tokens_to_burn = (tokens as u64)
+        .saturating_add(1)
+        .min(ctx.accounts.reserve_pool_tokens.amount);
     require!(tokens_to_burn > 0, VowError::EmptyReserve);
 
     let reserve_bump = ctx.accounts.config.reserve_bump;
@@ -173,7 +165,7 @@ pub fn handler(ctx: Context<WithdrawFromPool>) -> Result<()> {
             AccountMeta::new_readonly(ctx.accounts.reserve.key(), true), // user_transfer_authority
             AccountMeta::new(ctx.accounts.reserve_pool_tokens.key(), false),
             AccountMeta::new(ctx.accounts.pool_reserve_stake.key(), false),
-            AccountMeta::new(ctx.accounts.reserve.key(), false),         // lamports_to
+            AccountMeta::new(ctx.accounts.reserve.key(), false), // lamports_to
             AccountMeta::new(ctx.accounts.pool_manager_fee_account.key(), false),
             AccountMeta::new(ctx.accounts.pool_mint.key(), false),
             AccountMeta::new_readonly(ctx.accounts.clock.key(), false),
