@@ -36,7 +36,7 @@ pub struct WithdrawYield<'info> {
 }
 
 pub fn handler(ctx: Context<WithdrawYield>, amount: Option<u64>) -> Result<()> {
-    require!(!ctx.accounts.config.insolvent, VowError::ProtocolInsolvent);
+    crate::pool_math::require_payouts_allowed(&ctx.accounts.config)?;
 
     let idnft = &mut ctx.accounts.vow_state;
     let withdraw_amount = amount.unwrap_or(idnft.yield_balance);

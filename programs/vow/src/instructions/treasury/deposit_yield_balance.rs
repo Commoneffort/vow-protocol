@@ -46,6 +46,8 @@ pub struct DepositYieldBalance<'info> {
 
 pub fn handler(ctx: Context<DepositYieldBalance>, amount: u64) -> Result<()> {
     require!(amount > 0, VowError::InsufficientYieldBalance);
+    // Payouts are paused while insolvent, so a new deposit could not be taken back out.
+    require!(!ctx.accounts.config.insolvent, VowError::ProtocolInsolvent);
     require!(ctx.accounts.vow_state.active_stake, VowError::IdentityInactive);
     require!(ctx.accounts.unstake_escrow.data_is_empty(), VowError::AlreadyUnstaking);
 

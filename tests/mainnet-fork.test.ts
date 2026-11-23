@@ -186,6 +186,14 @@ const fmt = (l: bigint) => (Number(l) / XNT).toFixed(9);
       program.methods.harvest().accountsStrict({ config: configPda, vowState: legacy[0].addr }).rpc(),
       "PriceStale"
     );
+    // Payouts also wait for this epoch's solvency check.
+    const holder = (await program.account.vowState.all()).find((v) => big(v.account.yieldBalance) > 0n);
+    if (holder) {
+      const o = ownerKeys.get(holder.account.owner.toBase58())!;
+      await expectErr(program.methods.withdrawYield(new BN(1000)).accountsStrict({
+        config: configPda, vowState: holder.publicKey, reserve, owner: o.publicKey, systemProgram: SystemProgram.programId,
+      }).signers([o]).rpc(), "PriceStale");
+    }
   });
 
   it("first NAV update prices every share off real, redeemable assets", async () => {

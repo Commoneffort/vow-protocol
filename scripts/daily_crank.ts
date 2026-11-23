@@ -28,6 +28,8 @@ const STAKE_HISTORY = new PublicKey("SysvarStakeHistory1111111111111111111111111
 const STAKE_PROGRAM = new PublicKey("Stake11111111111111111111111111111111111111");
 
 const log = (msg: string) => process.stdout.write(`[${new Date().toISOString()}] ${msg}\n`);
+// Below this, a flush costs more in fees than it stakes (pool rounding leaves dust).
+const MIN_FLUSH_LAMPORTS = 1_000_000;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
@@ -77,7 +79,7 @@ async function main() {
   const reserveLamports = await connection.getBalance(reserve);
   const idle = reserveLamports - rent - (await owed());
   log(`Reserve ${reserveLamports} lamports; owed ${await owed()}; idle ${idle}`);
-  if (idle > 0) {
+  if (idle >= MIN_FLUSH_LAMPORTS) {
     try {
       const sig = await program.methods.flushReserveToPool()
         .accountsStrict({
@@ -93,7 +95,7 @@ async function main() {
       process.exitCode = 1;
     }
   } else {
-    log("No idle SOL to flush.");
+    log("No idle XNT worth flushing.");
   }
 
   // ── 3. keep owed SOL liquid ──────────────────────────────────────────────

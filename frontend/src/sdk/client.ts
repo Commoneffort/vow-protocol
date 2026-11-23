@@ -65,8 +65,8 @@ export class VowClient {
   /**
    * update_share_price instruction, or [] on testnet. Prepend to every value-moving
    * instruction (mint, add_stake, activate_stake, harvest, begin_unstake,
-   * update_yield_mode): the program rejects those with PriceStale unless the price
-   * was refreshed for the current epoch.
+   * update_yield_mode) and payout (yield_spend, withdraw_yield, complete_unstake):
+   * the program rejects those with PriceStale unless refreshed for the current epoch.
    */
   async freshPriceIxs(): Promise<TransactionInstruction[]> {
     const cfg = await this.getProtocolConfig();
@@ -291,6 +291,7 @@ export class VowClient {
     return this.program.methods
       .withdrawYield(amount != null ? new BN(amount) : null)
       .accountsStrict({ config, vowState, reserve, owner: this.provider.wallet.publicKey, systemProgram: SystemProgram.programId })
+      .preInstructions(await this.freshPriceIxs())
       .rpc();
   }
 
@@ -317,6 +318,7 @@ export class VowClient {
     return this.program.methods
       .completeUnstake()
       .accountsStrict({ config, vowState, unstakeEscrow, reserve, owner: this.provider.wallet.publicKey, systemProgram: SystemProgram.programId, clock: CLOCK_SYSVAR })
+      .preInstructions(await this.freshPriceIxs())
       .rpc();
   }
 

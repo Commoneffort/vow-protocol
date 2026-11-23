@@ -196,6 +196,17 @@ pub fn require_fresh_price(config: &ProtocolConfig) -> Result<()> {
     Ok(())
 }
 
+/// Fixed-claim payouts (yield_spend, withdraw_yield, complete_unstake) need a solvency
+/// check from this epoch, otherwise a claimant could exit after a loss but before anyone
+/// runs update_share_price. No freshness requirement on testnet (no pool configured).
+pub fn require_payouts_allowed(config: &ProtocolConfig) -> Result<()> {
+    require!(!config.insolvent, VowError::ProtocolInsolvent);
+    if config.spl_stake_pool != Pubkey::default() {
+        require!(config.solvency_epoch >= Clock::get()?.epoch, VowError::PriceStale);
+    }
+    Ok(())
+}
+
 pub struct NavInputs {
     pub reserve_lamports: u64,
     pub rent_exempt: u64,
@@ -221,7 +232,8 @@ pub struct NavPrice {
     /// false when liabilities exceed every asset (NAV would be negative). The caller
     /// must then halt value-moving instructions instead of pricing at ~0.
     pub solvent: bool,
-    /// true when the deficit exceeds `INSOLVENCY_DUST`: fixed-claim payouts must pause.
+    /// true when assets, before pool fees, fall short of liabilities by more than
+    /// `INSOLVENCY_DUST`: fixed-claim payouts must pause.
     pub payouts_paused: bool,
 }
 
@@ -246,19 +258,24 @@ pub fn nav_share_price(i: &NavInputs) -> Result<NavPrice> {
     let rate_price = rate_price.max(1);
     let cap = rate_price * MAX_PRICE_OVER_RATE_NUM / MAX_PRICE_OVER_RATE_DEN;
 
-    let pxnt_value = (i.pxnt_amount as u128)
+    let pxnt_gross = (i.pxnt_amount as u128)
         .checked_mul(i.pool_total_lamports as u128)
         .ok_or(VowError::MathOverflow)?
-        / i.pool_token_supply as u128
-        * w
-        / PPM;
+        / i.pool_token_supply as u128;
+    let pxnt_value = pxnt_gross * w / PPM;
     let liquid = (i.reserve_lamports as u128).saturating_sub(i.rent_exempt as u128);
     let liabilities = i.total_yield_claims as u128 + i.total_pending_unstake as u128;
-    let deficit = liabilities.saturating_sub(liquid + pxnt_value);
-    let payouts_paused = deficit > INSOLVENCY_DUST;
+    let net_deficit = liabilities.saturating_sub(liquid + pxnt_value);
+    // Payouts pause only for a real asset shortfall. Judged before pool fees, so a fee
+    // change alone can halt new value-moving actions but can't freeze backed claims.
+    let payouts_paused = liabilities.saturating_sub(liquid + pxnt_gross) > INSOLVENCY_DUST;
 
     if i.total_shares == 0 {
-        return Ok(NavPrice { price: rate_price, solvent: !payouts_paused, payouts_paused });
+        return Ok(NavPrice {
+            price: rate_price,
+            solvent: net_deficit <= INSOLVENCY_DUST,
+            payouts_paused,
+        });
     }
 
     let (nav, solvent) = if liquid >= liabilities {
@@ -366,6 +383,18 @@ mod tests {
         i.total_yield_claims = 1_000_000_000 + INSOLVENCY_DUST as u64 / 2;
         let p = nav_share_price(&i).unwrap();
         assert!(!p.payouts_paused);
+    }
+
+    #[test]
+    fn pool_fee_change_alone_does_not_pause_payouts() {
+        let mut i = base();
+        i.pxnt_amount = 10_000_000_000;
+        i.total_shares = 1_000_000_000;
+        i.total_yield_claims = 5_000_000_000; // owed from pXNT
+        i.withdrawal_fee_ppm = 999_999;       // pool sets an extreme fee
+        let p = nav_share_price(&i).unwrap();
+        assert!(!p.solvent, "value-moving instructions must halt");
+        assert!(!p.payouts_paused, "backed claims must not freeze");
     }
 
     #[test]

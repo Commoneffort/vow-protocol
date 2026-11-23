@@ -10,6 +10,8 @@ import { X1Wallet } from "./useX1Wallet";
 const RPC = import.meta.env.VITE_RPC_URL ?? "https://rpc.mainnet.x1.xyz";
 const connection = new Connection(RPC, "confirmed");
 const GENESIS_PRICE = new BN("1000000000000");
+// Below this, a flush costs more in network fees than it stakes (pool rounding leaves dust).
+const MIN_FLUSH_LAMPORTS = 1_000_000;
 
 const S: Record<string, React.CSSProperties> = {
   page:      { fontFamily: "monospace", padding: 24, maxWidth: 720 },
@@ -297,7 +299,7 @@ export default function Admin({ wallet }: { wallet: X1Wallet | null }) {
       const client = new VowClient(provider);
       // The program succeeds without moving anything when nothing is idle, so check first.
       const { idle } = await readReserve(client);
-      if (idle === 0) {
+      if (idle < MIN_FLUSH_LAMPORTS) {
         status("Nothing to flush: all reserve XNT is owed to users or required for rent. No transaction sent.");
         await loadConfig();
         return;
@@ -333,6 +335,7 @@ export default function Admin({ wallet }: { wallet: X1Wallet | null }) {
   const reserveRequired = (reserveRent ?? 0) + owedYield + owedUnstake;
   const idleLamports = reserveLoaded ? Math.max(0, reserveBalance - reserveRequired) : 0;
   const shortLamports = reserveLoaded ? Math.max(0, reserveRequired - reserveBalance) : 0;
+  const canFlush = idleLamports >= MIN_FLUSH_LAMPORTS;
 
   return (
     <div style={S.page}>
@@ -398,9 +401,9 @@ export default function Admin({ wallet }: { wallet: X1Wallet | null }) {
             <button style={{ ...S.btn, background: "#1a6b2a" }} onClick={handleUpdateSharePrice} disabled={loading}>
               Update Share Price
             </button>
-            <button style={{ ...S.btn, background: "#001d6e", opacity: idleLamports > 0 ? 1 : 0.45, cursor: idleLamports > 0 ? "pointer" : "not-allowed" }}
-              onClick={handleFlushReserveToPool} disabled={loading || idleLamports === 0}>
-              {!reserveLoaded ? "Flush Reserve → Pool" : idleLamports > 0 ? `Flush ${fmt(idleLamports, 6)} → Pool` : "Nothing to flush"}
+            <button style={{ ...S.btn, background: "#001d6e", opacity: canFlush ? 1 : 0.45, cursor: canFlush ? "pointer" : "not-allowed" }}
+              onClick={handleFlushReserveToPool} disabled={loading || !canFlush}>
+              {!reserveLoaded ? "Flush Reserve → Pool" : canFlush ? `Flush ${fmt(idleLamports, 6)} → Pool` : "Nothing to flush"}
             </button>
             <button style={{ ...S.btn, background: "#6b3a1a", opacity: shortLamports > 0 ? 1 : 0.45, cursor: shortLamports > 0 ? "pointer" : "not-allowed" }}
               onClick={handleWithdrawFromPool} disabled={loading || shortLamports === 0}>

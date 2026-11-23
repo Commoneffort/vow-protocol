@@ -88,6 +88,7 @@ pub fn handler(ctx: Context<UpdateSharePrice>) -> Result<()> {
     config.deposit_fee_ppm = pool.deposit_fee_ppm;
     config.withdrawal_fee_ppm = pool.withdrawal_fee_ppm;
     config.insolvent = nav.payouts_paused;
+    config.solvency_epoch = pool.last_update_epoch;
     if !nav.solvent {
         // Liabilities exceed every asset (e.g. a pool slash). Pricing at ~0 would let
         // newcomers' deposits silently cover the hole and first exits drain the rest, so

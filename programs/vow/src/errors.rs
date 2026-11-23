@@ -62,15 +62,15 @@ pub enum VowError {
     EmptyReserve,
     #[msg("Merkle tree capacity exhausted")]
     TreeCapacityExhausted,
-    #[msg("Pool stake account does not match the validator entry's registered stake account")]
+    #[msg("Stake pool account does not match the protocol configuration")]
     StakeAccountMismatch,
-    #[msg("Vow identity has no active stake — call recommit to re-activate")]
+    #[msg("Vow identity has no active stake — call activate_stake to re-activate")]
     IdentityInactive,
     #[msg("Vow identity already has an active stake position — unstake first")]
     IdentityAlreadyActive,
     #[msg("App registry account does not match calling program")]
     AppRegistryMismatch,
-    #[msg("Reserve has sufficient SOL — withdraw_from_pool only callable when reserve cannot cover the pending unstake")]
+    #[msg("Reserve has sufficient XNT — withdraw_from_pool is only callable when the reserve cannot cover what it owes")]
     ReserveSufficient,
     #[msg("Share price not yet synced from pool — call update_share_price before minting")]
     SharePriceNotSynced,
@@ -78,11 +78,11 @@ pub enum VowError {
     CallerNotAuthorized,
     #[msg("Share price is stale for this epoch — call update_share_price first (same transaction is fine)")]
     PriceStale,
-    #[msg("Reserve lacks liquid SOL for this payout — call withdraw_from_pool first")]
+    #[msg("Reserve lacks liquid XNT for this payout — call withdraw_from_pool first")]
     ReserveIlliquid,
     #[msg("Pool token account must be the reserve's canonical pXNT associated token account")]
     InvalidPoolTokenAccount,
-    #[msg("Stake pool configuration not supported (SOL deposit/withdraw authority set)")]
+    #[msg("Stake pool configuration not supported (XNT deposit/withdraw authority set)")]
     UnsupportedPoolConfig,
     #[msg("Payouts are paused: protocol liabilities exceed its assets")]
     ProtocolInsolvent,

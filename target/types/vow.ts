@@ -3171,12 +3171,12 @@ export type Vow = {
     {
       "code": 6030,
       "name": "stakeAccountMismatch",
-      "msg": "Pool stake account does not match the validator entry's registered stake account"
+      "msg": "Stake pool account does not match the protocol configuration"
     },
     {
       "code": 6031,
       "name": "identityInactive",
-      "msg": "Vow identity has no active stake — call recommit to re-activate"
+      "msg": "Vow identity has no active stake — call activate_stake to re-activate"
     },
     {
       "code": 6032,
@@ -3191,7 +3191,7 @@ export type Vow = {
     {
       "code": 6034,
       "name": "reserveSufficient",
-      "msg": "Reserve has sufficient SOL — withdraw_from_pool only callable when reserve cannot cover the pending unstake"
+      "msg": "Reserve has sufficient XNT — withdraw_from_pool is only callable when the reserve cannot cover what it owes"
     },
     {
       "code": 6035,
@@ -3211,7 +3211,7 @@ export type Vow = {
     {
       "code": 6038,
       "name": "reserveIlliquid",
-      "msg": "Reserve lacks liquid SOL for this payout — call withdraw_from_pool first"
+      "msg": "Reserve lacks liquid XNT for this payout — call withdraw_from_pool first"
     },
     {
       "code": 6039,
@@ -3221,7 +3221,7 @@ export type Vow = {
     {
       "code": 6040,
       "name": "unsupportedPoolConfig",
-      "msg": "Stake pool configuration not supported (SOL deposit/withdraw authority set)"
+      "msg": "Stake pool configuration not supported (XNT deposit/withdraw authority set)"
     },
     {
       "code": 6041,
@@ -3558,11 +3558,19 @@ export type Vow = {
             "type": "bool"
           },
           {
+            "name": "solvencyEpoch",
+            "docs": [
+              "Pool epoch at the last solvency check. Fixed-claim payouts require this to be",
+              "current, so a loss in a new epoch is seen before anyone can be paid."
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                15
+                7
               ]
             }
           },

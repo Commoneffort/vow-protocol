@@ -280,6 +280,7 @@ export default function DAppDemo({ wallet, client, lastVowState }: Props) {
             // Demo session is unrestricted (program_count = 0), so no caller PDA is needed.
             callerAuthority: null,
           })
+          .preInstructions(await readClient.freshPriceIxs()) // payouts need this epoch's solvency check
           .transaction();
 
         const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash("confirmed");
@@ -563,6 +564,7 @@ await client.createSession(vowPubkey, sessionIndex, sessionKeypair.publicKey,
 await myProgram.methods.buyItem(new BN(amount))
   .accounts({ vowState: vowPubkey, sessionAccount, reserve, destination,
               sessionSigner: sessionKeypair.publicKey, callerAuthority, ... })
+  .preInstructions(await client.freshPriceIxs()) // payouts need this epoch's price
   .signers([sessionKeypair])   // ← session key, not user wallet
   .rpc();`}
         </pre>

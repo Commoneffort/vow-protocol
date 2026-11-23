@@ -3165,12 +3165,12 @@
     {
       "code": 6030,
       "name": "StakeAccountMismatch",
-      "msg": "Pool stake account does not match the validator entry's registered stake account"
+      "msg": "Stake pool account does not match the protocol configuration"
     },
     {
       "code": 6031,
       "name": "IdentityInactive",
-      "msg": "Vow identity has no active stake — call recommit to re-activate"
+      "msg": "Vow identity has no active stake — call activate_stake to re-activate"
     },
     {
       "code": 6032,
@@ -3185,7 +3185,7 @@
     {
       "code": 6034,
       "name": "ReserveSufficient",
-      "msg": "Reserve has sufficient SOL — withdraw_from_pool only callable when reserve cannot cover the pending unstake"
+      "msg": "Reserve has sufficient XNT — withdraw_from_pool is only callable when the reserve cannot cover what it owes"
     },
     {
       "code": 6035,
@@ -3205,7 +3205,7 @@
     {
       "code": 6038,
       "name": "ReserveIlliquid",
-      "msg": "Reserve lacks liquid SOL for this payout — call withdraw_from_pool first"
+      "msg": "Reserve lacks liquid XNT for this payout — call withdraw_from_pool first"
     },
     {
       "code": 6039,
@@ -3215,7 +3215,7 @@
     {
       "code": 6040,
       "name": "UnsupportedPoolConfig",
-      "msg": "Stake pool configuration not supported (SOL deposit/withdraw authority set)"
+      "msg": "Stake pool configuration not supported (XNT deposit/withdraw authority set)"
     },
     {
       "code": 6041,
@@ -3552,11 +3552,19 @@
             "type": "bool"
           },
           {
+            "name": "solvency_epoch",
+            "docs": [
+              "Pool epoch at the last solvency check. Fixed-claim payouts require this to be",
+              "current, so a loss in a new epoch is seen before anyone can be paid."
+            ],
+            "type": "u64"
+          },
+          {
             "name": "_reserved",
             "type": {
               "array": [
                 "u8",
-                15
+                7
               ]
             }
           },

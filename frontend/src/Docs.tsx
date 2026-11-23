@@ -353,6 +353,7 @@ await program.methods.depositYieldBalance(new BN(amount))
 // Your program must choose or validate \`destination\` itself: Vow does not.
 await myProgram.methods.buyItem(new BN(amount))
   .accounts({ /* the accounts above */ sessionSigner: sessionKeypair.publicKey })
+  .preInstructions(await client.freshPriceIxs()) // payouts need this epoch's price
   .signers([sessionKeypair])
   .rpc();`}
         </code>
@@ -727,6 +728,7 @@ async function agentSpend(vowState, sessAcc, amount, destination) {
   const tx = await agentProgram.methods
     .pay(new BN(amount))
     .accounts({ ..., destination, sessionSigner: agentKeypair.publicKey })
+    .preInstructions(await client.freshPriceIxs())
     .transaction();
   const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash();
   tx.recentBlockhash = blockhash;
@@ -799,10 +801,10 @@ else:      NAV = P − (L − S)
 price = min(NAV / total_shares, 1.25 × redeemable pool rate)`}</code>
         <ul style={{ fontSize: 13, lineHeight: 2, color: "#333", paddingLeft: 20, marginTop: 10 }}>
           <li><strong>Entry:</strong> new stake buys shares net of the pool's deposit and withdrawal fees (0.1% each today), so existing holders don't pay a newcomer's fees.</li>
-          <li><strong>Freshness:</strong> mint, add_stake, activate_stake, harvest, begin_unstake, and update_yield_mode revert with <code>PriceStale</code> unless the price was refreshed for the current epoch. The SDK prepends the refresh.</li>
+          <li><strong>Freshness:</strong> mint, add_stake, activate_stake, harvest, begin_unstake, and update_yield_mode revert with <code>PriceStale</code> unless the price was refreshed for the current epoch. Payouts (yield_spend, withdraw_yield, complete_unstake) need the same refresh, so a new epoch's loss is seen before anyone is paid. The SDK prepends it, and it waits for the X1 pool's own epoch update.</li>
           <li><strong>Exit:</strong> the payout is fixed at begin_unstake. complete_unstake pays it in full or reverts with <code>ReserveIlliquid</code>, never a partial amount.</li>
           <li><strong>Liquidity:</strong> flushes keep rent, yield balances, and pending unstakes in liquid XNT. If the reserve is short, anyone can redeem just enough pXNT.</li>
-          <li><strong>Insolvency:</strong> if liabilities exceed all assets by more than 0.001 XNT, value-moving instructions halt and yield spends, yield withdrawals, and unstake payouts pause, so early claimants can't drain what remains. Everything resumes automatically at the next price update once the protocol is solvent.</li>
+          <li><strong>Insolvency:</strong> if assets before pool fees fall short of liabilities by more than 0.001 XNT, value-moving instructions halt, payouts pause, and new yield deposits are rejected, so early claimants can't drain what remains. A pool fee change alone halts value-moving instructions but does not freeze payouts. Everything resumes at the next price update once the protocol is solvent.</li>
         </ul>
         <h3 style={{ ...S.h3, marginTop: 12 }}>Risks and trust assumptions</h3>
         <ul style={{ fontSize: 13, lineHeight: 2, color: "#333", paddingLeft: 20, margin: 0 }}>

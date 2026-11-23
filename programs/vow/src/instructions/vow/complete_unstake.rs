@@ -52,7 +52,7 @@ pub struct CompleteUnstake<'info> {
 }
 
 pub fn handler(ctx: Context<CompleteUnstake>) -> Result<()> {
-    require!(!ctx.accounts.config.insolvent, VowError::ProtocolInsolvent);
+    crate::pool_math::require_payouts_allowed(&ctx.accounts.config)?;
     let escrow = &ctx.accounts.unstake_escrow;
 
     require!(
