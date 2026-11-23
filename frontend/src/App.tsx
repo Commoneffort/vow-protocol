@@ -10,6 +10,7 @@ import Admin from "./Admin";
 import DAppDemo from "./DAppDemo";
 import Docs from "./Docs";
 import VowCard from "./components/VowCard";
+import Landing from "./components/Landing";
 
 const RPC = import.meta.env.VITE_RPC_URL ?? "https://rpc.mainnet.x1.xyz";
 const connection = new Connection(RPC, "confirmed");
@@ -59,19 +60,19 @@ function fmtError(e: any): string {
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
-const CARD: React.CSSProperties = { border: "1px solid #ddd", borderRadius: 6, padding: 20, marginTop: 20 };
-const BTN: React.CSSProperties = { marginTop: 10, padding: "8px 20px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer" };
-const BTN_RED: React.CSSProperties = { ...BTN, background: "#c0392b" };
-const BTN_GRAY: React.CSSProperties = { ...BTN, background: "#444" };
-const BTN_GREEN: React.CSSProperties = { ...BTN, background: "#27ae60" };
-const BTN_SM: React.CSSProperties = { padding: "3px 10px", background: "#555", color: "#fff", border: "none", borderRadius: 3, cursor: "pointer", fontSize: 12 };
-const BTN_SM_RED: React.CSSProperties = { ...BTN_SM, background: "#c0392b" };
-const INPUT: React.CSSProperties = { padding: "5px 8px", border: "1px solid #ccc", borderRadius: 3, fontSize: 13 };
-const STATUS: React.CSSProperties = { marginTop: 10, padding: 10, background: "#f4f4f4", fontFamily: "monospace", fontSize: 12, wordBreak: "break-all", borderRadius: 4 };
-const LABEL: React.CSSProperties = { fontWeight: 600, marginRight: 6, fontSize: 13 };
-const BADGE_ACTIVE: React.CSSProperties = { display:"inline-block", padding:"2px 10px", borderRadius:12, background:"#27ae60", color:"#fff", fontWeight:700, fontSize:12 };
-const BADGE_DORMANT: React.CSSProperties = { ...BADGE_ACTIVE, background:"#888" };
-const HINT: React.CSSProperties = { fontSize: 12, color: "#888", marginTop: 4 };
+const CARD: React.CSSProperties = { background: "var(--surface)", border: "1px solid var(--line)", borderTop: "3px solid var(--accent)", borderRadius: 14, boxShadow: "var(--shadow)", padding: 24, marginTop: 18 };
+const BTN: React.CSSProperties = { marginTop: 12, padding: "10px 20px", background: "var(--accent)", color: "#fff", border: "none", borderRadius: 9, cursor: "pointer", fontSize: 13.5, fontWeight: 650 };
+const BTN_RED: React.CSSProperties = { ...BTN, background: "#b3263f" };
+const BTN_GRAY: React.CSSProperties = { ...BTN, background: "var(--ink-2)" };
+const BTN_GREEN: React.CSSProperties = { ...BTN, background: "#0d8a5b" };
+const BTN_SM: React.CSSProperties = { padding: "4px 10px", background: "#5d5868", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600 };
+const BTN_SM_RED: React.CSSProperties = { ...BTN_SM, background: "#b3263f" };
+const INPUT: React.CSSProperties = { padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--surface)", color: "var(--text)" };
+const STATUS: React.CSSProperties = { marginTop: 12, padding: "10px 12px", background: "var(--accent-soft)", color: "var(--text)", fontFamily: "var(--mono)", fontSize: 12, wordBreak: "break-all", borderRadius: 8 };
+const LABEL: React.CSSProperties = { fontWeight: 650, marginRight: 6, fontSize: 13 };
+const BADGE_ACTIVE: React.CSSProperties = { display:"inline-block", padding:"3px 11px", borderRadius:99, background:"#0d8a5b", color:"#fff", fontWeight:700, fontSize:12 };
+const BADGE_DORMANT: React.CSSProperties = { ...BADGE_ACTIVE, background:"#77727f" };
+const HINT: React.CSSProperties = { fontSize: 13, color: "var(--muted)", marginTop: 4 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtDate(ts: number) { return ts > 0 ? new Date(ts * 1000).toISOString().slice(0, 10) : "—"; }
@@ -106,7 +107,7 @@ const YIELD_MODES = [
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function App() {
   const wallet = useX1Wallet();
-  const [tab, setTab] = useState<"user" | "admin" | "demo" | "docs">("user");
+  const [tab, setTab] = useState<"overview" | "user" | "admin" | "demo" | "docs">("overview");
   const [protocolReady, setProtocolReady] = useState<boolean | null>(null);
 
   const client = useMemo(() => {
@@ -562,118 +563,184 @@ export default function App() {
     } catch (e: any) { setFundStatus(fmtError(e)); }
   }, [client, fundTarget, fundXnt]);
 
-  // ── Admin tab ──────────────────────────────────────────────────────────────
-  if (tab === "admin") return (
-    <div style={{ maxWidth: 1000, margin: "0 auto", padding: 24 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1 style={{ margin: 0 }}>Vow Protocol</h1>
-        <button onClick={() => setTab("user")} style={BTN_GRAY}>← User</button>
+  // ── Active identity ─────────────────────────────────────────────────────
+  const [ws, setWs] = useState<"identity" | "stake" | "yield" | "sessions">("identity");
+  const [connectError, setConnectError] = useState("");
+  const wasConnected = useRef(false);
+
+  const handleConnect = useCallback(async () => {
+    setConnectError("");
+    try { await wallet.connect(); }
+    catch (e: any) { setConnectError(e?.message?.includes("not found") ? "No X1 wallet found. Install the X1 Wallet extension, then try again." : "Wallet connection was cancelled or failed."); }
+  }, [wallet]);
+
+  useEffect(() => {
+    if (wallet.connected && !wasConnected.current && tab === "overview") setTab("user");
+    wasConnected.current = wallet.connected;
+  }, [wallet.connected]);
+
+  // Owner actions always target the connected wallet's active identity.
+  useEffect(() => {
+    setAddStakeAddr(lastVowState); setHarvestAddr(lastVowState); setWithdrawAddr(lastVowState);
+    setUnstakeAddr(lastVowState); setActivateAddr(lastVowState); setSessionIdnft(lastVowState);
+    setDepositAddr(lastVowState);
+  }, [lastVowState]);
+
+  const refreshIdentity = useCallback(async () => {
+    if (!client || !wallet.publicKey || !lastVowState) return;
+    try {
+      const state = await client.getVowState(new PublicKey(lastVowState));
+      if ((state.owner as PublicKey).equals(wallet.publicKey)) {
+        setIdentity({ ...state, _addr: lastVowState });
+        setLookupAddr(lastVowState);
+      }
+    } catch { /* identity not available yet */ }
+  }, [client, wallet.publicKey?.toBase58(), lastVowState]);
+
+  useEffect(() => { refreshIdentity(); },
+    [refreshIdentity, mintStatus, addStakeStatus, harvestStatus, withdrawStatus, depositStatus, unstakeStatus, activateStatus]);
+
+  useEffect(() => {
+    if (ws === "sessions" && lastVowState) loadSessions(lastVowState);
+  }, [ws, lastVowState, client]);
+
+  const own = identity?._addr === lastVowState ? identity : null;
+  const WORKSPACES = [
+    { key: "identity", num: "01", title: "Identity", sub: "Your credential and record", lede: "The soulbound credential tied to your wallet, and the history it has earned.", tab: "#6d4bd1", soft: "#f0ecfb" },
+    { key: "stake", num: "02", title: "Stake", sub: "Commit, top up, or exit", lede: "Manage the capital behind your vow, from top-ups to a clean exit.", tab: "#b3263f", soft: "#fcedf0" },
+    { key: "yield", num: "03", title: "Yield", sub: "Harvest and withdraw", lede: "Turn staking rewards into a balance you can withdraw or let apps spend.", tab: "#0d8a5b", soft: "#e7f6f0" },
+    { key: "sessions", num: "04", title: "Sessions", sub: "Delegate with limits", lede: "Give apps and agents narrow, revocable authority over your yield.", tab: "#1f62d0", soft: "#e9f1fd" },
+  ] as const;
+  const activeWs = WORKSPACES.find(w => w.key === ws)!;
+
+  const topbar = (
+    <header className="topbar">
+      <button className="brand" onClick={() => setTab("overview")} aria-label="Vow Protocol home">
+        <span className="brand-mark" /><span>VOW</span>
+      </button>
+      <span className="net-pill">X1 Mainnet</span>
+      <nav className="topnav" aria-label="Main">
+        {([["overview", "Overview"], ["user", "App"], ["docs", "Docs"], ["demo", "Demo"], ["admin", "Protocol"]] as const).map(([k, label]) => (
+          <button key={k} aria-current={tab === k ? "page" : undefined} onClick={() => setTab(k)}>{label}</button>
+        ))}
+      </nav>
+      <div className="wallet-area">
+        {wallet.connected ? (<>
+          <span className="wallet-chip" title={wallet.publicKey?.toBase58()}>{short(wallet.publicKey?.toBase58() ?? "")}</span>
+          <button className="btn btn-ghost btn-sm" onClick={wallet.disconnect}>Disconnect</button>
+        </>) : (
+          <button className="btn btn-gold btn-sm" onClick={handleConnect} disabled={wallet.connecting}>{wallet.connecting ? "Connecting…" : "Connect wallet"}</button>
+        )}
       </div>
-      <Admin wallet={wallet} />
+    </header>
+  );
+  const footer = (
+    <footer className="footer"><div className="footer-inner">
+      <span>Vow Protocol · Program <code>7ytRMwKykiJnbT3gdLXPCUZMzrTNZZbr7m2i7fwiyjbJ</code></span>
+      <a href="https://github.com/Commoneffort/vow-protocol" target="_blank" rel="noreferrer">Source on GitHub</a>
+    </div></footer>
+  );
+  const pageHead = (eyebrow: string, title: string, text: string) => (
+    <div className="page-head"><span className="eyebrow">{eyebrow}</span><h1>{title}</h1><p>{text}</p></div>
+  );
+
+  if (tab === "overview") return (
+    <div className="app-root">
+      {topbar}
+      <main style={{ flex: 1 }}>
+        <Landing connected={wallet.connected} connecting={wallet.connecting} connectError={connectError}
+          onConnect={handleConnect} onOpenApp={() => setTab("user")} onOpenDemo={() => setTab("demo")} rpc={RPC} />
+      </main>
+      {footer}
+    </div>
+  );
+
+  if (tab === "admin") return (
+    <div className="app-root">{topbar}
+      <main className="page">
+        {pageHead("Protocol", "Protocol health", "Live reserve, pool position, and permissionless maintenance anyone can run.")}
+        <Admin wallet={wallet} />
+      </main>{footer}
     </div>
   );
 
   if (tab === "demo") return (
-    <div style={{ maxWidth: 820, margin: "0 auto", padding: 24 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1 style={{ margin: 0 }}>dApp Integration Demo</h1>
-        <button onClick={() => setTab("user")} style={BTN_GRAY}>← Back</button>
-      </div>
-      <DAppDemo wallet={wallet} client={client} lastVowState={lastVowState} />
+    <div className="app-root">{topbar}
+      <main className="page">
+        {pageHead("Interactive demo", "See a session key at work", "Set the limits, let an app spend, and watch the protocol's rules hold.")}
+        <DAppDemo wallet={wallet} client={client} lastVowState={lastVowState} />
+      </main>{footer}
     </div>
   );
 
   if (tab === "docs") return (
-    <div style={{ maxWidth: 860, margin: "0 auto", padding: 24 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1 style={{ margin: 0 }}>Vow Protocol — Docs</h1>
-        <button onClick={() => setTab("user")} style={BTN_GRAY}>← Back</button>
-      </div>
-      <Docs />
+    <div className="app-root">{topbar}
+      <main className="page page-narrow">
+        {pageHead("Documentation", "Vow Protocol docs", "How the protocol works, what it guarantees, and how to build on it.")}
+        <Docs />
+      </main>{footer}
     </div>
   );
 
-  // ── User tab ───────────────────────────────────────────────────────────────
+  // ── App ────────────────────────────────────────────────────────────────
+  const needsIdentity = (
+    <div className="panel empty">
+      <h2>Your vow starts with an identity</h2>
+      <p>Mint a soulbound identity to unlock staking, yield, and session keys.</p>
+      <button style={{ ...BTN, background: "#6d4bd1" }} onClick={() => setWs("identity")}>Go to Identity</button>
+    </div>
+  );
+
   return (
-    <div style={{ maxWidth: 760, margin: "0 auto", padding: 24, fontFamily: "system-ui, sans-serif" }}>
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
-        <div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-            <h1 style={{ margin: 0, fontSize: 26, letterSpacing: -0.5 }}>Vow Protocol</h1>
-            <span style={{ fontSize: 11, background: "#ecfdf5", color: "#059669", padding: "2px 7px", borderRadius: 10, fontWeight: 600 }}>X1 Mainnet</span>
-          </div>
-          <p style={{ color: "#64748b", marginTop: 4, fontSize: 12 }}>
-            Soulbound identity · Stake-backed reputation · Wallet-free session keys
-          </p>
-        </div>
-        <nav style={{ display: "flex", gap: 4, marginTop: 4 }}>
-          {(["docs", "demo", "admin"] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)}
-              style={{ padding: "6px 14px", fontSize: 12, fontWeight: 600, background: "transparent",
-                border: "1px solid #e2e8f0", borderRadius: 6, cursor: "pointer", color: "#374151",
-                textTransform: "capitalize" as const }}>
-              {t === "demo" ? "dApp Demo" : t === "admin" ? "Protocol ⚙" : "Docs"}
-            </button>
-          ))}
-        </nav>
-      </div>
-
-      {/* Wallet bar */}
-      <div style={{ marginTop: 16, padding: "10px 16px", background: "#f8f8f8", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+    <div className="app-root">
+      {topbar}
+      <main className="page">
         {!wallet.connected ? (
-          <button onClick={wallet.connect} disabled={wallet.connecting}
-            style={{ ...BTN, marginTop: 0, padding: "10px 28px", fontSize: 14, background: "#0f172a", letterSpacing: 0.5 }}>
-            {wallet.connecting ? "Connecting…" : "Connect X1 Wallet"}
-          </button>
-        ) : (
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={{ fontFamily: "monospace", fontSize: 12, color: "#27ae60" }}>● {wallet.publicKey?.toBase58()}</span>
-            <button onClick={wallet.disconnect} style={{ ...BTN_GRAY, marginTop: 0, padding: "4px 12px", fontSize: 12 }}>Disconnect</button>
+          <div className="connect-panel">
+            <span className="eyebrow">Your Vow</span>
+            <h1>Connect to continue</h1>
+            <p>Your identity lives on-chain, so it's available from any device with your wallet.</p>
+            <button className="btn btn-gold" onClick={handleConnect} disabled={wallet.connecting}>{wallet.connecting ? "Connecting…" : "Connect X1 Wallet"}</button>
+            {connectError && <div className="notice">{connectError}</div>}
+            <p style={{ fontSize: 13, marginTop: 18, marginBottom: 0 }}>
+              Need a wallet?{" "}
+              <a href="https://chromewebstore.google.com/detail/x1-wallet/kcfmcpdmlchhbikbogddmgopmjbflnae" target="_blank" rel="noreferrer">Install X1 Wallet</a>
+            </p>
           </div>
-        )}
-      </div>
-
-      {!wallet.connected && (
-        <p style={{ color: "#888", marginTop: 12, fontSize: 13 }}>
-          Install the{" "}
-          <a href="https://chromewebstore.google.com/detail/x1-wallet/kcfmcpdmlchhbikbogddmgopmjbflnae"
-            target="_blank" rel="noreferrer" style={{ color: "#2980b9" }}>
-            X1 Wallet Chrome extension
-          </a>{" "}
-          and connect to continue.
-        </p>
-      )}
-
-      {wallet.connected && protocolReady === false && (
-        <div style={{ marginTop: 16, padding: 14, background: "#fff3cd", border: "1px solid #ffc107", borderRadius: 6, fontFamily: "monospace", fontSize: 12 }}>
-          Protocol not initialized. Contact admin or run:<br />
-          <code>npx ts-node --skip-project scripts/initialize-protocol.ts</code>
-        </div>
-      )}
-
-      {wallet.connected && (<>
-
-        {/* ── What is a VOW Identity? ────────────────────────────────────────── */}
-        <div style={{ ...CARD, background: "#f0f4ff", border: "1px solid #c7d5ff" }}>
-          <h3 style={{ marginTop: 0, marginBottom: 8 }}>What is Vow Protocol?</h3>
-          <p style={{ fontSize: 13, color: "#333", marginTop: 0, lineHeight: 1.7 }}>
-            A Vow identity is a <strong>soulbound on-chain credential</strong> — permanently tied to your wallet.
-            Unlike standard NFTs, it cannot be transferred, sold, or traded.
-            This is by design: identity must stay with its owner.
-          </p>
-          <p style={{ fontSize: 13, color: "#333", marginTop: 8, lineHeight: 1.7 }}>
-            It lives as a <strong>program account</strong> — wallets and explorers
-            show it as a plain account. That is correct: it's not a financial token, it's an identity
-            credential. The account address IS the identity.
-          </p>
-          <p style={{ fontSize: 13, color: "#333", marginTop: 8, lineHeight: 1.7 }}>
-            It holds a <strong>stake position</strong> in the X1 Foundation stake pool, earns yield, and issues
-            <strong> session keys</strong> that let dApps spend yield on your behalf within limits you set.
-            All rules are enforced on-chain — no server involved.
-          </p>
-        </div>
-
+        ) : (<>
+          {protocolReady === false && <div className="notice">The protocol could not be read from X1 right now. Try again shortly.</div>}
+          <div className="workspace">
+            <aside className="rail">
+              <div className="rail-card">
+                <span className="eyebrow">Your Vow</span>
+                {own ? (<>
+                  <div className="rail-class">{CLASS_NAMES[own.class]}</div>
+                  <div className="rail-status">{own.activeStake ? (own.matured ? "Active · matured" : `Active · unlocks ${fmtDate(own.unlockAt?.toNumber())}`) : "Dormant"}</div>
+                  <div className="rail-stat"><span>Principal</span><span>{fmtXnt(own.principalLamports, 3)}</span></div>
+                  <div className="rail-stat"><span>Yield balance</span><span>{fmtXnt(own.yieldBalance, 4)}</span></div>
+                  <div className="rail-stat"><span>Mode</span><span style={{ textTransform: "capitalize" }}>{Object.keys(own.yieldMode)[0]}</span></div>
+                  <div className="rail-stat"><span>Vows kept</span><span>{own.totalFulfilled?.toString()} of {own.totalCommitments?.toString()}</span></div>
+                </>) : <div className="rail-status" style={{ marginBottom: 0 }}>No identity yet</div>}
+              </div>
+              <nav className="ws-nav" aria-label="Workspaces">
+                {WORKSPACES.map(w => (
+                  <button key={w.key} aria-current={ws === w.key ? "true" : undefined} onClick={() => setWs(w.key)}
+                    style={{ ["--tab" as any]: w.tab, ["--tab-soft" as any]: w.soft }}>
+                    <span className="ws-num">{w.num}</span>
+                    <span className="ws-title">{w.title}</span>
+                    <span className="ws-sub">{w.sub}</span>
+                  </button>
+                ))}
+              </nav>
+            </aside>
+            <div className={`stage ws-${ws}`}>
+              <div className="stage-head">
+                <span className="stage-num">{activeWs.num}</span>
+                <div><h1>{activeWs.title}</h1><p>{activeWs.lede}</p></div>
+              </div>
+              {ws !== "identity" && !lastVowState && needsIdentity}
+              {ws === "identity" && (<>
+                {!ownedIdentity && (<>
         {/* ── Mint ────────────────────────────────────────────────────── */}
         <div style={CARD}>
           <h2 style={{ marginTop: 0 }}>Mint Vow Identity</h2>
@@ -722,16 +789,16 @@ export default function App() {
           <button onClick={handleMint} disabled={!!ownedIdentity} style={{ ...BTN, opacity: ownedIdentity ? 0.45 : 1 }}>Mint</button>
           {mintStatus && <div style={STATUS}>{mintStatus}</div>}
         </div>
-
+                </>)}
         {/* ── Identity lookup ──────────────────────────────────────────── */}
         <div style={CARD}>
-          <h2 style={{ marginTop: 0 }}>Identity Lookup</h2>
-          <p style={HINT}>Enter your Vow identity address to view your credential and reputation history.</p>
+          <h2 style={{ marginTop: 0 }}>Your Credential</h2>
+          <p style={HINT}>Your soulbound card, position, and permanent reputation. You can also look up any public identity.</p>
           <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
             <label>
               <span style={LABEL}>Vow identity address:</span>
               <input value={lookupAddr} onChange={e => setLookupAddr(e.target.value)}
-                placeholder="leave blank to use last minted"
+                placeholder="Any Vow identity address"
                 style={{ ...INPUT, width: 360, marginLeft: 4 }} />
             </label>
             <button onClick={handleLookup} style={{ ...BTN, marginTop: 0 }}>Load</button>
@@ -746,6 +813,7 @@ export default function App() {
                 <button key={addr} style={{ ...BTN_SM, background: addr === lookupAddr ? "#1a1a1a" : "#888" }}
                   onClick={async () => {
                     setLookupAddr(addr);
+                    setLastVowState(addr);
                     if (!client) return;
                     setLookupStatus("Loading…");
                     try {
@@ -865,7 +933,8 @@ export default function App() {
             </div>
           )}
         </div>
-
+              </>)}
+              {ws === "stake" && lastVowState && (<>
         {/* ── Add Stake ────────────────────────────────────────────────── */}
         <div style={CARD}>
           <h2 style={{ marginTop: 0 }}>Add Stake</h2>
@@ -879,11 +948,6 @@ export default function App() {
           </div>
           <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap", marginTop: 12 }}>
             <label>
-              <span style={LABEL}>Vow identity:</span>
-              <input value={addStakeAddr} onChange={e => setAddStakeAddr(e.target.value)}
-                placeholder="or uses last minted" style={{ ...INPUT, width: 340, marginLeft: 4 }} />
-            </label>
-            <label>
               <span style={LABEL}>Amount to add (XNT):</span>
               <input type="number" min={0.001} step={0.001} value={addStakeXnt}
                 onChange={e => setAddStakeXnt(Number(e.target.value))}
@@ -893,7 +957,54 @@ export default function App() {
           </div>
           {addStakeStatus && <div style={STATUS}>{addStakeStatus}</div>}
         </div>
-
+        {/* ── Unstake ──────────────────────────────────────────────────── */}
+        <div style={CARD}>
+          <h2 style={{ marginTop: 0 }}>Unstake</h2>
+          <p style={HINT}>
+            Unstake withdraws your principal + yield_balance back to your wallet.
+            The Vow identity account <strong>stays on-chain permanently</strong> as a credential — your reputation
+            history is preserved. Identity becomes Dormant until you Activate Stake again.
+            Requires lock period to have expired (matured). Your payout is fixed when you begin: shares × the current
+            share price + yield_balance. You earn no further yield while waiting, and it is paid in full when you complete,
+            from the next epoch on. If pXNT must be redeemed just after an epoch boundary, completion can take a few extra minutes.
+          </p>
+          <div style={{ marginTop: 8 }}>
+            <button onClick={handleBeginUnstake} style={BTN}>Begin Unstake</button>
+            <button onClick={handleCompleteUnstake} style={{ ...BTN_GRAY, marginLeft: 8 }}>
+              Complete Unstake (after 1 epoch)
+            </button>
+          </div>
+          {unstakeStatus && <div style={STATUS}>{unstakeStatus}</div>}
+        </div>
+        {/* ── Activate Stake ───────────────────────────────────────────── */}
+        <div style={CARD}>
+          <h2 style={{ marginTop: 0 }}>Activate Stake</h2>
+          <p style={HINT}>
+            Re-activates a Dormant identity with a new stake position.
+            Reputation (first_staked_at, commitments, fulfilled, stake_days, highest_class) is preserved and updated.
+            Old sessions are invalidated — create new ones after activation.
+          </p>
+          <div style={{ marginTop: 10 }}>
+            <label>
+              <span style={LABEL}>New stake (XNT):</span>
+              <input type="number" min={1} value={activateXnt}
+                onChange={e => setActivateXnt(Number(e.target.value))}
+                style={{ ...INPUT, width: 80, marginLeft: 4 }} />
+            </label>
+          </div>
+          <div style={{ marginTop: 10 }}>
+            {YIELD_MODES.map(({ key, label }) => (
+              <label key={key} style={{ marginRight: 16, fontSize: 13 }}>
+                <input type="radio" name="am" value={key} checked={activateMode === key}
+                  onChange={() => setActivateMode(key as any)} /> {label}
+              </label>
+            ))}
+          </div>
+          <button onClick={handleActivate} style={BTN_GREEN}>Activate Stake</button>
+          {activateStatus && <div style={STATUS}>{activateStatus}</div>}
+        </div>
+              </>)}
+              {ws === "yield" && lastVowState && (<>
         {/* ── Harvest / Withdraw ───────────────────────────────────────── */}
         <div style={CARD}>
           <h2 style={{ marginTop: 0 }}>Harvest & Withdraw Yield</h2>
@@ -903,22 +1014,12 @@ export default function App() {
             Treasury/Hybrid: shares worth the gain (all or half) are converted to yield_balance, a fixed XNT amount that no longer earns yield.
           </p>
           <div style={{ display: "flex", gap: 12, alignItems: "flex-end", marginTop: 12 }}>
-            <label>
-              <span style={LABEL}>Vow identity:</span>
-              <input value={harvestAddr} onChange={e => setHarvestAddr(e.target.value)}
-                placeholder="or uses last minted" style={{ ...INPUT, width: 340, marginLeft: 4 }} />
-            </label>
             <button onClick={handleHarvest} style={{ ...BTN, marginTop: 0 }}>Harvest</button>
           </div>
           {harvestStatus && <div style={STATUS}>{harvestStatus}</div>}
 
           <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #eee" }}>
             <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
-              <label>
-                <span style={LABEL}>Vow identity:</span>
-                <input value={withdrawAddr} onChange={e => setWithdrawAddr(e.target.value)}
-                  style={{ ...INPUT, width: 280, marginLeft: 4 }} />
-              </label>
               <label>
                 <span style={LABEL}>Amount (XNT, blank = all):</span>
                 <input value={withdrawAmt} onChange={e => setWithdrawAmt(e.target.value)}
@@ -941,7 +1042,7 @@ export default function App() {
               <label>
                 <span style={LABEL}>Vow identity:</span>
                 <input value={depositAddr} onChange={e => setDepositAddr(e.target.value)}
-                  placeholder="or uses last minted" style={{ ...INPUT, width: 280, marginLeft: 4 }} />
+                  placeholder="Identity to fund" style={{ ...INPUT, width: 280, marginLeft: 4 }} />
               </label>
               <label>
                 <span style={LABEL}>Amount (XNT):</span>
@@ -954,65 +1055,8 @@ export default function App() {
           </div>
           {depositStatus && <div style={STATUS}>{depositStatus}</div>}
         </div>
-
-        {/* ── Unstake ──────────────────────────────────────────────────── */}
-        <div style={CARD}>
-          <h2 style={{ marginTop: 0 }}>Unstake</h2>
-          <p style={HINT}>
-            Unstake withdraws your principal + yield_balance back to your wallet.
-            The Vow identity account <strong>stays on-chain permanently</strong> as a credential — your reputation
-            history is preserved. Identity becomes Dormant until you Activate Stake again.
-            Requires lock period to have expired (matured). Your payout is fixed when you begin: shares × the current
-            share price + yield_balance. You earn no further yield while waiting, and it is paid in full when you complete,
-            from the next epoch on. If pXNT must be redeemed just after an epoch boundary, completion can take a few extra minutes.
-          </p>
-          <label>
-            <span style={LABEL}>Vow identity:</span>
-            <input value={unstakeAddr} onChange={e => setUnstakeAddr(e.target.value)}
-              style={{ ...INPUT, width: 380, marginLeft: 4 }} />
-          </label>
-          <div style={{ marginTop: 8 }}>
-            <button onClick={handleBeginUnstake} style={BTN}>Begin Unstake</button>
-            <button onClick={handleCompleteUnstake} style={{ ...BTN_GRAY, marginLeft: 8 }}>
-              Complete Unstake (after 1 epoch)
-            </button>
-          </div>
-          {unstakeStatus && <div style={STATUS}>{unstakeStatus}</div>}
-        </div>
-
-        {/* ── Activate Stake ───────────────────────────────────────────── */}
-        <div style={CARD}>
-          <h2 style={{ marginTop: 0 }}>Activate Stake</h2>
-          <p style={HINT}>
-            Re-activates a Dormant identity with a new stake position.
-            Reputation (first_staked_at, commitments, fulfilled, stake_days, highest_class) is preserved and updated.
-            Old sessions are invalidated — create new ones after activation.
-          </p>
-          <label>
-            <span style={LABEL}>Vow identity:</span>
-            <input value={activateAddr} onChange={e => setActivateAddr(e.target.value)}
-              style={{ ...INPUT, width: 340, marginLeft: 4 }} />
-          </label>
-          <div style={{ marginTop: 10 }}>
-            <label>
-              <span style={LABEL}>New stake (XNT):</span>
-              <input type="number" min={1} value={activateXnt}
-                onChange={e => setActivateXnt(Number(e.target.value))}
-                style={{ ...INPUT, width: 80, marginLeft: 4 }} />
-            </label>
-          </div>
-          <div style={{ marginTop: 10 }}>
-            {YIELD_MODES.map(({ key, label }) => (
-              <label key={key} style={{ marginRight: 16, fontSize: 13 }}>
-                <input type="radio" name="am" value={key} checked={activateMode === key}
-                  onChange={() => setActivateMode(key as any)} /> {label}
-              </label>
-            ))}
-          </div>
-          <button onClick={handleActivate} style={BTN_GREEN}>Activate Stake</button>
-          {activateStatus && <div style={STATUS}>{activateStatus}</div>}
-        </div>
-
+              </>)}
+              {ws === "sessions" && lastVowState && (<>
         {/* ── Session Keys ─────────────────────────────────────────────── */}
         <div style={CARD}>
           <h2 style={{ marginTop: 0 }}>Session Keys</h2>
@@ -1025,13 +1069,7 @@ export default function App() {
 
           {/* Session address selector + load */}
           <div style={{ marginTop: 12 }}>
-            <label>
-              <span style={LABEL}>Vow identity:</span>
-              <input value={sessionIdnft} onChange={e => setSessionIdnft(e.target.value)}
-                placeholder="leave blank to use last minted"
-                style={{ ...INPUT, width: 360, marginLeft: 4 }} />
-            </label>
-            <button onClick={() => loadSessions()} style={{ ...BTN_GRAY, marginLeft: 8, marginTop: 0 }}>
+            <button onClick={() => loadSessions()} style={{ ...BTN_GRAY, marginTop: 0 }}>
               {sessionsLoading ? "Loading…" : "Load My Sessions"}
             </button>
           </div>
@@ -1260,7 +1298,6 @@ export default function App() {
             )}
           </div>
         </div>
-
         {/* ── Fund session key ──────────────────────────────────────────── */}
         <div style={CARD}>
           <h2 style={{ marginTop: 0 }}>Fund Session Key</h2>
@@ -1283,8 +1320,12 @@ export default function App() {
           </div>
           {fundStatus && <div style={STATUS}>{fundStatus}</div>}
         </div>
-
-      </>)}
+              </>)}
+            </div>
+          </div>
+        </>)}
+      </main>
+      {footer}
     </div>
   );
 }

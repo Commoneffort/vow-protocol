@@ -2,10 +2,10 @@ import React from "react";
 import { CLASS_NAMES, LOCK_DAYS } from "./sdk/types";
 
 const S: Record<string, React.CSSProperties> = {
-  card:    { border: "1px solid #ddd", borderRadius: 6, padding: 24, marginTop: 20 },
-  h2:      { marginTop: 0, marginBottom: 12, fontSize: 18 },
-  h3:      { marginTop: 0, marginBottom: 10, fontSize: 15 },
-  p:       { fontSize: 13, lineHeight: 1.8, color: "#333", marginTop: 0, marginBottom: 10 },
+  card:    { background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 14, boxShadow: "var(--shadow)", padding: 28, marginTop: 20 },
+  h2:      { marginTop: 0, marginBottom: 14, fontSize: 23 },
+  h3:      { marginTop: 0, marginBottom: 10, fontSize: 16 },
+  p:       { fontSize: 14, lineHeight: 1.75, color: "var(--text)", marginTop: 0, marginBottom: 10 },
   table:   { width: "100%", borderCollapse: "collapse" as const, fontSize: 13, marginTop: 12 },
   th:      { textAlign: "left" as const, padding: "8px 12px", background: "#f5f5f5", borderBottom: "2px solid #ddd", fontSize: 12, fontWeight: 700 },
   td:      { padding: "7px 12px", borderBottom: "1px solid #f0f0f0", verticalAlign: "top" as const },
@@ -33,7 +33,7 @@ const CLASS_FEATURES = [
 
 export default function Docs() {
   return (
-    <div style={{ fontFamily: "system-ui, sans-serif", paddingBottom: 40 }}>
+    <div style={{ marginTop: 18, paddingBottom: 20 }}>
 
       {/* Resource links */}
       <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 4, flexWrap: "wrap" as const }}>
@@ -185,7 +185,7 @@ export default function Docs() {
           <li><strong>Direct deposit:</strong> call <code style={{ background: "#f4f4f4", padding: "1px 5px", borderRadius: 3 }}>deposit_yield_balance(amount)</code> — any signer (user wallet, session key, dApp server) can fund an identity's yield_balance immediately. The deposit goes to the shared reserve and is credited instantly. This lets early users, game servers, or the session key itself bootstrap spending without waiting for yield.</li>
         </ol>
         <p style={S.p}>
-          The dApp demo uses the second path: fund the session key with XNT, and when you click Execute, the session key auto-deposits into yield_balance then immediately calls yield_spend — all without the user's wallet.
+          Either path produces a balance the session can spend. The Demo tab simulates these limits without sending a transaction.
         </p>
 
         <h3 style={{ ...S.h3, marginTop: 4 }}>Session keys are full X1 signers</h3>

@@ -488,6 +488,8 @@ sudo bash deploy/install-x1vow.sh   # nginx site + TLS certificate (safe to re-r
 deploy/publish-frontend.sh          # build from the lockfile and switch releases atomically
 ```
 
+The live files belong to a dedicated no-login `vowdeploy` account, so publishing asks for your sudo password.
+
 The former Vercel URLs are redirect-only (`deploy/vercel-redirect`).
 
 ### Live mainnet PDAs

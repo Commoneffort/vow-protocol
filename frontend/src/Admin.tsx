@@ -14,15 +14,15 @@ const GENESIS_PRICE = new BN("1000000000000");
 const MIN_FLUSH_LAMPORTS = 1_000_000;
 
 const S: Record<string, React.CSSProperties> = {
-  page:      { fontFamily: "monospace", padding: 24, maxWidth: 720 },
+  page:      { marginTop: 18 },
   h1:        { fontSize: 18, marginBottom: 4 },
   sub:       { color: "#888", fontSize: 12, marginBottom: 20 },
   grid2:     { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 },
-  card:      { border: "1px solid #ddd", borderRadius: 6, padding: 16, marginBottom: 16 },
-  cardTitle: { fontWeight: "bold", fontSize: 13, marginBottom: 10, color: "#444" },
-  row:       { display: "flex", justifyContent: "space-between", fontSize: 13, padding: "3px 0", borderBottom: "1px solid #f0f0f0" },
-  label:     { color: "#888" },
-  val:       { fontWeight: "bold" },
+  card:      { background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 14, boxShadow: "var(--shadow)", padding: 20, marginBottom: 18 },
+  cardTitle: { fontWeight: 700, fontSize: 15, marginBottom: 12, color: "var(--text)" },
+  row:       { display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13, padding: "6px 0", borderBottom: "1px solid var(--line)" },
+  label:     { color: "var(--muted)" },
+  val:       { fontWeight: 650, textAlign: "right" as const },
   btnBar:    { display: "flex", gap: 8, flexWrap: "wrap" as const, marginTop: 10 },
   btn:       { padding: "8px 16px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontSize: 12 },
   btnRed:    { padding: "8px 16px", background: "#c0392b", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontSize: 12 },
@@ -339,7 +339,6 @@ export default function Admin({ wallet }: { wallet: X1Wallet | null }) {
 
   return (
     <div style={S.page}>
-      <div style={S.h1}>Vow Protocol</div>
       <div style={S.sub}>Program: 7ytRMwKykiJnbT3gdLXPCUZMzrTNZZbr7m2i7fwiyjbJ</div>
 
       {!wallet?.publicKey && (
@@ -389,8 +388,8 @@ export default function Admin({ wallet }: { wallet: X1Wallet | null }) {
 
       {/* SPL Pool Management — mainnet only */}
       {config?.splStakePool?.toBase58?.() !== "11111111111111111111111111111111" && (
-        <div style={{ ...S.card, border: "1px solid #001d6e", background: "#f0f4ff" }}>
-          <div style={{ ...S.cardTitle, color: "#001d6e" }}>Stake Pool Management</div>
+        <div style={{ ...S.card, borderTop: "3px solid #1f62d0" }}>
+          <div style={S.cardTitle}>Stake Pool Management</div>
           <div style={{ fontSize: 11, color: "#444", marginBottom: 12 }}>
             <b>Flush</b> deposits only <i>idle</i> reserve XNT into the X1 Foundation stake pool, receiving pXNT that
             earns staking yield. XNT backing yield balances and pending unstakes always stays liquid.<br/>

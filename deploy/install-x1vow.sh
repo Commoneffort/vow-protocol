@@ -10,7 +10,23 @@ AV=/etc/nginx/sites-available/x1vow.xyz
 EN=/etc/nginx/sites-enabled/x1vow.xyz
 CERT=/etc/letsencrypt/live/x1vow.xyz/fullchain.pem
 
-[[ -f /home/owlx1/vow-site/current/index.html ]] || { echo "Site not published. Run deploy/publish-frontend.sh first."; exit 1; }
+# The live site is owned by a dedicated account with no login, so the user that runs
+# the crank and holds keys cannot change what visitors load.
+SITE=/var/www/x1vow
+id -u vowdeploy >/dev/null 2>&1 || useradd --system --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin vowdeploy
+install -d -o vowdeploy -g vowdeploy -m 755 "$SITE" "$SITE/releases"
+if [[ ! -f "$SITE/current/index.html" ]]; then
+  SRC=/home/owlx1/vow-site/current
+  [[ -f "$SRC/index.html" ]] || { echo "Site not built. Run deploy/publish-frontend.sh first."; exit 1; }
+  REL="initial-$(date -u +%Y%m%d-%H%M%S)"
+  install -d -o vowdeploy -g vowdeploy -m 755 "$SITE/releases/$REL"
+  cp -rL "$SRC/." "$SITE/releases/$REL/"
+  chown -R vowdeploy:vowdeploy "$SITE/releases/$REL"
+  chmod -R u=rwX,go=rX "$SITE/releases/$REL"
+  ln -sfn "releases/$REL" "$SITE/current.tmp"
+  chown -h vowdeploy:vowdeploy "$SITE/current.tmp"
+  mv -T "$SITE/current.tmp" "$SITE/current"
+fi
 
 BACKUP="$(mktemp -d)"
 for f in "$AV" /etc/nginx/snippets/x1vow-security.conf /etc/nginx/snippets/x1vow-site.conf; do
