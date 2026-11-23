@@ -1,0 +1,25 @@
+{
+  "name": "vow-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.31.0",
+    "@solana/web3.js": "^1.95",
+    "react": "^18.2",
+    "react-dom": "^18.2"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2",
+    "@types/react-dom": "^18.2",
+    "@vitejs/plugin-react": "^4.2",
+    "typescript": "^5.3.3",
+    "vite": "^5.0",
+    "vite-plugin-node-polyfills": "^0.22.0"
+  },
+  "note": "Reference implementation only — not required for protocol operation"
+}

@@ -12,12 +12,17 @@ target/*
 node_modules/
 sdk/node_modules/
 
-# Frontend — deployed separately to Vercel, not tracked here
-frontend/
+# Frontend build output and leftovers (source is tracked)
+frontend/node_modules/
+frontend/dist/
+frontend/frontend/
+frontend/.vercel/
+frontend/src/sdk/idnft*
 
 # Vercel deployment metadata
 .vercel/
 vercel.json
+!deploy/vercel-redirect/vercel.json
 .vercelignore
 
 # Test validator state — contains ephemeral keypairs, ledger data
@@ -34,9 +39,20 @@ id.json
 *.log
 yarn-error.log
 
-# Secrets
+# Secrets: never commit keys, tokens, or local agent settings
 .env
 .env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*keypair*.json
+wallet.json
+.claude/
+
+# Unpatched-findings report: keep private while its issues are open (public repo)
+AUDIT-2026-11-23.md
 
 # Test-only CPI fixture build output
 tests/fixtures/*/target/
