@@ -27,17 +27,6 @@ pub const CLASS_NAMES: [&str; 8] = [
     "Ruby", "Opal", "Topaz", "Emerald", "Aquamarine", "Sapphire", "Amethyst", "Xenturion",
 ];
 
-// Default scoring weights (admin-adjustable)
-pub const DEFAULT_CREDITS_WEIGHT: u32 = 10;
-pub const DEFAULT_SELF_STAKE_WEIGHT: u32 = 20;
-pub const DEFAULT_SKIP_PENALTY: u32 = 5;
-pub const DEFAULT_COMMISSION_PENALTY: u32 = 3;
-pub const DEFAULT_SELF_STAKE_CEIL: u64 = 1_000_000 * LAMPORTS_PER_XNT; // 1M XNT
-pub const UPTIME_EPOCH_THRESHOLD: u8 = 4; // must have credits in last 4 epochs
-
-// Solana native stake account data size
-pub const STAKE_ACCOUNT_SPACE: u64 = 200;
-
 /// Seed for the PDA a dApp program signs with (via invoke_signed) when it CPIs into
 /// yield_spend for a whitelisted session: find_program_address(&[VOW_CALLER_SEED], app_program_id).
 pub const VOW_CALLER_SEED: &[u8] = b"vow_caller";

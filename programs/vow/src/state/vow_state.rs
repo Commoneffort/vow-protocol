@@ -120,6 +120,13 @@ pub fn class_for_stake(lamports: u64) -> Result<u8> {
     }
 }
 
+/// New `sessions_invalidated_at`: strictly after both the clock and the previous value,
+/// so every session that already exists (start_ts <= now) is invalid, even one created
+/// in the same second. `create_session` starts new sessions at or after this value.
+pub fn next_invalidation(previous: i64, now: i64) -> i64 {
+    previous.max(now).saturating_add(1)
+}
+
 pub fn lock_duration(class: u8) -> i64 {
     LOCK_SECONDS[class as usize]
 }

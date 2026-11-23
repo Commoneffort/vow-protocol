@@ -33,7 +33,7 @@ pub fn handler(ctx: Context<CloseSession>) -> Result<()> {
     // expiry_ts == 0 means "no expiry" — do not treat as expired
     let expired = session.expiry_ts > 0 && clock.unix_timestamp >= session.expiry_ts;
     let inactive = !session.active;
-    let invalidated = session.start_ts <= idnft.sessions_invalidated_at;
+    let invalidated = session.start_ts < idnft.sessions_invalidated_at;
     let identity_unstaked = !idnft.active_stake;
 
     require!(

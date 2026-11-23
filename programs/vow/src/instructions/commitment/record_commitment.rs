@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use crate::state::{CommitmentRecord, CrGate, VowState};
 use crate::constants::LOCK_SECONDS;
+use crate::errors::VowError;
 
 #[derive(Accounts)]
 pub struct RecordCommitment<'info> {
@@ -31,7 +32,12 @@ pub struct RecordCommitment<'info> {
     )]
     pub cr_gate: Account<'info, CrGate>,
 
-    #[account(mut)]
+    /// Must be the identity owner: these records are one-shot, so a third party could
+    /// otherwise freeze them at a low value.
+    #[account(
+        mut,
+        address = vow_state.owner @ VowError::InvalidOwner,
+    )]
     pub payer: Signer<'info>,
 
     pub system_program: Program<'info, System>,

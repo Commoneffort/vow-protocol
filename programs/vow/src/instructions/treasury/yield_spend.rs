@@ -77,6 +77,7 @@ pub struct YieldSpend<'info> {
 }
 
 pub fn handler(ctx: Context<YieldSpend>, amount: u64) -> Result<()> {
+    require!(!ctx.accounts.config.insolvent, VowError::ProtocolInsolvent);
 
     let clock = Clock::get()?;
     let idnft = &mut ctx.accounts.vow_state;

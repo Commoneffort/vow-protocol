@@ -4,7 +4,7 @@ use crate::errors::VowError;
 use crate::events::VowStakeActivated;
 use crate::instructions::harvest::settle_idnft;
 use crate::pool_math::shares_for_deposit;
-use crate::state::{VowState, ProtocolConfig, YieldMode, class_for_stake, lock_duration};
+use crate::state::{next_invalidation, VowState, ProtocolConfig, YieldMode, class_for_stake, lock_duration};
 
 #[derive(Accounts)]
 pub struct ActivateStake<'info> {
@@ -78,7 +78,7 @@ pub fn handler(
     idnft.unlock_at = unlock_at;
     idnft.matured = false;
     idnft.active_stake = true;
-    idnft.sessions_invalidated_at = clock.unix_timestamp;
+    idnft.sessions_invalidated_at = next_invalidation(idnft.sessions_invalidated_at, clock.unix_timestamp);
     idnft.current_stake_started_at = clock.unix_timestamp;
 
     idnft.total_commitments = idnft.total_commitments.saturating_add(1);

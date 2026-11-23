@@ -1659,6 +1659,10 @@ export type Vow = {
         },
         {
           "name": "payer",
+          "docs": [
+            "Must be the identity owner: these records are one-shot, so a third party could",
+            "otherwise freeze them at a low value."
+          ],
           "writable": true,
           "signer": true
         },
@@ -1763,6 +1767,10 @@ export type Vow = {
         },
         {
           "name": "payer",
+          "docs": [
+            "Must be the identity owner: these records are one-shot, so a third party could",
+            "otherwise freeze them at a low value."
+          ],
           "writable": true,
           "signer": true
         },
@@ -3214,6 +3222,11 @@ export type Vow = {
       "code": 6040,
       "name": "unsupportedPoolConfig",
       "msg": "Stake pool configuration not supported (SOL deposit/withdraw authority set)"
+    },
+    {
+      "code": 6041,
+      "name": "protocolInsolvent",
+      "msg": "Payouts are paused: protocol liabilities exceed its assets"
     }
   ],
   "types": [
@@ -3536,11 +3549,20 @@ export type Vow = {
             "type": "u32"
           },
           {
+            "name": "insolvent",
+            "docs": [
+              "Set by update_share_price when liabilities exceed all assets by more than dust.",
+              "Pauses fixed-claim payouts so the first claimants can't drain what remains.",
+              "Cleared automatically by update_share_price once the protocol is solvent."
+            ],
+            "type": "bool"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                16
+                15
               ]
             }
           },

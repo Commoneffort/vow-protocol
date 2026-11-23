@@ -84,4 +84,6 @@ pub enum VowError {
     InvalidPoolTokenAccount,
     #[msg("Stake pool configuration not supported (SOL deposit/withdraw authority set)")]
     UnsupportedPoolConfig,
+    #[msg("Payouts are paused: protocol liabilities exceed its assets")]
+    ProtocolInsolvent,
 }

@@ -56,6 +56,15 @@ pub fn handler(
     params: SessionParams,
     session_index: u32,
 ) -> Result<()> {
+    // A profile's whitelist applies unless the caller passes an explicit list. Dropping
+    // it would silently create an unrestricted session that can pay any address.
+    let allowed_program_ids: Vec<Pubkey> = match &ctx.accounts.authority_profile {
+        Some(p) if allowed_program_ids.is_empty() => {
+            require!(p.program_count as usize <= 8, VowError::TooManyProgramIds);
+            p.default_allowed_program_ids[..p.program_count as usize].to_vec()
+        }
+        _ => allowed_program_ids,
+    };
     require!(allowed_program_ids.len() <= 8, VowError::TooManyProgramIds);
     // L-2: reject zero-key session — default pubkey is not a valid session signer
     require!(session_key != Pubkey::default(), VowError::SessionInactive);
@@ -66,6 +75,7 @@ pub fn handler(
     // Read nonce before mutably borrowing vow_state below
     let creation_nonce = vow.session_nonce;
     let vow_key = vow.key();
+    let invalidated_at = vow.sessions_invalidated_at;
 
     let clock = Clock::get()?;
     let session = &mut ctx.accounts.session_account;
@@ -73,9 +83,14 @@ pub fn handler(
     let (daily_limit, lifetime_limit, expiry_ts, velocity_limit) =
         if let Some(profile) = &ctx.accounts.authority_profile {
             require_keys_eq!(profile.wallet, ctx.accounts.owner.key(), VowError::Unauthorized);
-            let expiry = if params.expiry_ts == 0 {
+            // default_expiry_days == 0 means "no expiry", not "expired on creation".
+            let expiry = if params.expiry_ts != 0 {
+                params.expiry_ts
+            } else if profile.default_expiry_days == 0 {
+                0
+            } else {
                 clock.unix_timestamp + (profile.default_expiry_days as i64 * 86_400)
-            } else { params.expiry_ts };
+            };
             let daily    = if params.daily_limit == 0    { profile.default_daily_limit    } else { params.daily_limit };
             let lifetime = if params.lifetime_limit == 0 { profile.default_lifetime_limit } else { params.lifetime_limit };
             let velocity = if params.velocity_limit == 0 { 0 } else { params.velocity_limit };
@@ -89,7 +104,8 @@ pub fn handler(
     session.session_index   = session_index;
     session.creation_nonce  = creation_nonce;
     session.program_count   = allowed_program_ids.len() as u8;
-    session.start_ts        = clock.unix_timestamp;
+    // Never before the last invalidation, so a session created right after one is valid.
+    session.start_ts        = clock.unix_timestamp.max(invalidated_at);
     session.expiry_ts       = expiry_ts;
     session.daily_limit     = daily_limit;
     session.lifetime_limit  = lifetime_limit;

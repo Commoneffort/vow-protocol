@@ -43,4 +43,4 @@ done
 
 cd "$ROOT"
 ANCHOR_PROVIDER_URL="$URL" ANCHOR_WALLET="$WALLET" MOCK_CALLER_ID="$MOCK_ID" \
-  npx ts-mocha -p ./tsconfig.json -t 1000000 tests/protocol.test.ts tests/yield-spend-cpi.test.ts
+  npx ts-mocha -p ./tsconfig.json -t 1000000 tests/protocol.test.ts tests/yield-spend-cpi.test.ts tests/audit-2026-11-23.test.ts

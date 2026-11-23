@@ -19,6 +19,11 @@ pub struct SetMintCounter<'info> {
 }
 
 pub fn handler(ctx: Context<SetMintCounter>, new_counter: u64) -> Result<()> {
+    // Migration helper: testnet only, like the other dev instructions.
+    require!(
+        ctx.accounts.config.spl_stake_pool == Pubkey::default(),
+        VowError::Unauthorized
+    );
     let config = &mut ctx.accounts.config;
     require!(new_counter > config.total_minted, VowError::InvalidStakeAccount);
     config.total_minted = new_counter;

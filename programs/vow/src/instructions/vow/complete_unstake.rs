@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use crate::errors::VowError;
 use crate::events::VowUnstaked;
-use crate::state::{VowState, ProtocolConfig, UnstakeEscrow};
+use crate::state::{next_invalidation, VowState, ProtocolConfig, UnstakeEscrow};
 
 /// Called after ≥1 epoch since begin_unstake. Withdraws principal + yield from
 /// the reserve back to the owner. The VOW state is NOT closed — it remains
@@ -52,6 +52,7 @@ pub struct CompleteUnstake<'info> {
 }
 
 pub fn handler(ctx: Context<CompleteUnstake>) -> Result<()> {
+    require!(!ctx.accounts.config.insolvent, VowError::ProtocolInsolvent);
     let escrow = &ctx.accounts.unstake_escrow;
 
     require!(
@@ -106,7 +107,7 @@ pub fn handler(ctx: Context<CompleteUnstake>) -> Result<()> {
     }
 
     idnft.active_stake = false;
-    idnft.sessions_invalidated_at = clock.unix_timestamp;
+    idnft.sessions_invalidated_at = next_invalidation(idnft.sessions_invalidated_at, clock.unix_timestamp);
 
     emit!(VowUnstaked {
         asset_id,

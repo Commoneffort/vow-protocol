@@ -221,7 +221,12 @@ pub struct NavPrice {
     /// false when liabilities exceed every asset (NAV would be negative). The caller
     /// must then halt value-moving instructions instead of pricing at ~0.
     pub solvent: bool,
+    /// true when the deficit exceeds `INSOLVENCY_DUST`: fixed-claim payouts must pause.
+    pub payouts_paused: bool,
 }
+
+/// Rounding-sized deficits (0.001 XNT) never pause payouts.
+pub const INSOLVENCY_DUST: u128 = 1_000_000;
 
 /// NAV-based share price (see module docs), capped at 125% of the redeemable pool
 /// rate. Rounds down — dust stays with the protocol.
@@ -241,10 +246,6 @@ pub fn nav_share_price(i: &NavInputs) -> Result<NavPrice> {
     let rate_price = rate_price.max(1);
     let cap = rate_price * MAX_PRICE_OVER_RATE_NUM / MAX_PRICE_OVER_RATE_DEN;
 
-    if i.total_shares == 0 {
-        return Ok(NavPrice { price: rate_price, solvent: true });
-    }
-
     let pxnt_value = (i.pxnt_amount as u128)
         .checked_mul(i.pool_total_lamports as u128)
         .ok_or(VowError::MathOverflow)?
@@ -253,6 +254,12 @@ pub fn nav_share_price(i: &NavInputs) -> Result<NavPrice> {
         / PPM;
     let liquid = (i.reserve_lamports as u128).saturating_sub(i.rent_exempt as u128);
     let liabilities = i.total_yield_claims as u128 + i.total_pending_unstake as u128;
+    let deficit = liabilities.saturating_sub(liquid + pxnt_value);
+    let payouts_paused = deficit > INSOLVENCY_DUST;
+
+    if i.total_shares == 0 {
+        return Ok(NavPrice { price: rate_price, solvent: !payouts_paused, payouts_paused });
+    }
 
     let (nav, solvent) = if liquid >= liabilities {
         (pxnt_value + (liquid - liabilities) * d / PPM * w / PPM, true)
@@ -266,7 +273,7 @@ pub fn nav_share_price(i: &NavInputs) -> Result<NavPrice> {
         .ok_or(VowError::MathOverflow)?
         / i.total_shares)
         .clamp(1, cap);
-    Ok(NavPrice { price, solvent })
+    Ok(NavPrice { price, solvent, payouts_paused })
 }
 
 /// SOL the reserve must keep liquid: rent floor + every fixed claim on it.
@@ -346,6 +353,26 @@ mod tests {
         i.pxnt_amount = 1_000_000_000;
         i.total_shares = 1_000_000_000;
         i.total_yield_claims = 2_000_000_000; // owes more than everything it holds
-        assert!(!nav_share_price(&i).unwrap().solvent);
+        let p = nav_share_price(&i).unwrap();
+        assert!(!p.solvent);
+        assert!(p.payouts_paused);
+    }
+
+    #[test]
+    fn rounding_deficit_does_not_pause_payouts() {
+        let mut i = base();
+        i.pxnt_amount = 1_001_001_001;
+        i.total_shares = 1_000;
+        i.total_yield_claims = 1_000_000_000 + INSOLVENCY_DUST as u64 / 2;
+        let p = nav_share_price(&i).unwrap();
+        assert!(!p.payouts_paused);
+    }
+
+    #[test]
+    fn insolvency_with_no_shares_is_still_detected() {
+        let mut i = base();
+        i.total_yield_claims = 2_000_000_000;
+        let p = nav_share_price(&i).unwrap();
+        assert!(!p.solvent && p.payouts_paused);
     }
 }

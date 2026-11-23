@@ -73,6 +73,8 @@ pub fn handler(ctx: Context<BeginUnstake>) -> Result<()> {
     // Zero out the financial position; active_stake stays true until complete_unstake
     idnft.shares = 0;
     idnft.yield_balance = 0;
+    // Any settled gain is already inside lamports_owed.
+    idnft.accrued_gain = 0;
 
     let escrow = &mut ctx.accounts.unstake_escrow;
     escrow.vow_state = idnft.key();

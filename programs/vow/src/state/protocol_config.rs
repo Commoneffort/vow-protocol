@@ -22,7 +22,11 @@ pub struct ProtocolConfig {
     pub deposit_fee_ppm: u32,
     /// Pool SOL withdrawal fee, parts-per-million (rounded up; max of current/scheduled).
     pub withdrawal_fee_ppm: u32,
-    pub _reserved: [u8; 16],
+    /// Set by update_share_price when liabilities exceed all assets by more than dust.
+    /// Pauses fixed-claim payouts so the first claimants can't drain what remains.
+    /// Cleared automatically by update_share_price once the protocol is solvent.
+    pub insolvent: bool,
+    pub _reserved: [u8; 15],
 
     // Running total of all active unstake escrow lamports_owed — used for pro-rata payout
     pub total_pending_unstake: u64,
@@ -45,7 +49,7 @@ impl ProtocolConfig {
         + 8   // total_yield_claims
         + 8   // last_pool_lamports
         + 8   // total_minted
-        + 8 + 4 + 4 + 16  // price_epoch, deposit_fee_ppm, withdrawal_fee_ppm, _reserved
+        + 8 + 4 + 4 + 1 + 15  // price_epoch, deposit_fee_ppm, withdrawal_fee_ppm, insolvent, _reserved
         + 8   // total_pending_unstake
         + 32  // spl_stake_pool
         + 32  // spl_pool_mint

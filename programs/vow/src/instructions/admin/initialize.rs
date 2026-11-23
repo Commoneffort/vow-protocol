@@ -59,7 +59,8 @@ pub fn handler(
     config.price_epoch = 0;
     config.deposit_fee_ppm = 0;
     config.withdrawal_fee_ppm = 0;
-    config._reserved = [0u8; 16];
+    config.insolvent = false;
+    config._reserved = [0u8; 15];
     config.total_pending_unstake = 0;
     config.spl_stake_pool = spl_stake_pool;
     config.spl_pool_mint = spl_pool_mint;

@@ -296,13 +296,13 @@ describe("vow protocol (testnet mode)", () => {
     const commit = () => program.methods.recordCommitment().accountsStrict({
       commitmentRecord: record, vowState: v,
       crGate: pda([Buffer.from("cr_commit"), record.toBuffer(), v.toBuffer()]),
-      payer: admin.publicKey, systemProgram: SystemProgram.programId,
-    }).rpc();
+      payer: o.publicKey, systemProgram: SystemProgram.programId,
+    }).signers([o]).rpc();
     const fulfill = () => program.methods.recordFulfillment().accountsStrict({
       commitmentRecord: record, vowState: v,
       crGate: pda([Buffer.from("cr_fulfill"), record.toBuffer(), v.toBuffer()]),
-      payer: admin.publicKey, systemProgram: SystemProgram.programId,
-    }).rpc();
+      payer: o.publicKey, systemProgram: SystemProgram.programId,
+    }).signers([o]).rpc();
     await commit();
     await expectErr(commit(), "already in use");
     await fastUnlock(v);

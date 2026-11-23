@@ -72,14 +72,17 @@ pub fn handler(ctx: Context<Harvest>) -> Result<()> {
 
     let (yield_credited, shares_burned) = match idnft.yield_mode {
         YieldMode::Compound => {
-            idnft.total_harvested = idnft.total_harvested.saturating_add(gain.max(0) as u64);
-            idnft.accrued_gain = 0;
+            // A loss stays on the books so a later recovery isn't counted as new gain.
+            if gain > 0 {
+                idnft.total_harvested = idnft.total_harvested.saturating_add(gain as u64);
+                idnft.accrued_gain = 0;
+            }
             (0u64, 0u128)
         }
 
         YieldMode::Treasury => {
             if gain <= 0 {
-                idnft.accrued_gain = 0;
+                // Keep the loss: only value above the previous high is harvestable.
                 (0u64, 0u128)
             } else {
                 let treasury_amount = gain as u64;
@@ -103,7 +106,7 @@ pub fn handler(ctx: Context<Harvest>) -> Result<()> {
 
         YieldMode::Hybrid => {
             if gain <= 0 {
-                idnft.accrued_gain = 0;
+                // Keep the loss: only value above the previous high is harvestable.
                 (0u64, 0u128)
             } else {
                 let treasury_amount = (gain as u64) / 2;

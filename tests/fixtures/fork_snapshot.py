@@ -121,6 +121,8 @@ for a in rpc("getProgramAccounts", [vow_id, {"encoding": "base64"}]):
                 ["solana-keygen", "pubkey", kp], text=True
             ).strip()
         data[40:72] = b58decode(owners[real_owner]).rjust(32, b"\0")
+        # Expire the lock (local copy only) so the full-exit test works for every identity.
+        data[154:162] = (1).to_bytes(8, "little")
     write_account(a["pubkey"], a["account"], bytes(data))
 
 json.dump(owners, open(os.path.join(work, "owners", "map.json"), "w"), indent=1)
