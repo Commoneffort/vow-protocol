@@ -3,7 +3,7 @@
 **Soulbound on-chain identity for X1.** Users stake XNT to mint a permanent credential tied to their wallet. The credential earns yield, accumulates verifiable reputation, and grants dApps the ability to transact on behalf of the user — without a wallet popup for every action.
 
 - **Program ID**: `7ytRMwKykiJnbT3gdLXPCUZMzrTNZZbr7m2i7fwiyjbJ` (X1 mainnet)
-- **Frontend**: https://vow-protocol.vercel.app
+- **Frontend**: https://x1vow.xyz
 - **RPC**: `https://rpc.mainnet.x1.xyz`
 
 ---
@@ -14,7 +14,7 @@ Each wallet can hold exactly one Vow identity (enforced on-chain by the `["owner
 
 - **Soulbound** — non-transferable. The credential belongs to the wallet that created it, forever.
 - **Permanent** — the account never closes. Unstaking transitions the identity to Dormant, not deleted. All history is preserved.
-- **Yield-bearing** — staked XNT earns DPoS rewards through the X1 Foundation SPL delegation pool. Yield accrues to `yield_balance` and can be spent by dApps without user interaction.
+- **Yield-bearing** — staked XNT earns DPoS rewards through the X1 Foundation SPL delegation pool. Harvesting in Treasury or Hybrid mode moves gain into `yield_balance`, which sessions can spend without a wallet popup.
 - **Cross-device** — the identity lives on-chain, not in a browser. Connect the same wallet from any device and the identity, yield balance, and all session keys are immediately accessible.
 
 ---
@@ -49,7 +49,7 @@ Every top-up (`add_stake`) re-locks the whole position for the (possibly upgrade
 ## Identity Lifecycle
 
 ```
-Mint (add_stake + active_stake=true)
+Mint (stake + active_stake=true)
   │
   ▼
 Active ──── harvest, yield_spend, sessions ────┐
@@ -86,14 +86,16 @@ The central feature. A session key lets a dApp spend a user's `yield_balance` au
 - **PDA seeds**: `["session", vow_state_pubkey, session_index_le4]`
 - `session_index: u32` — user-chosen slot (0, 1, 2 …). Deterministic and stable.
 - `expiry_ts = 0` — session never expires.
-- `program_count = 0` — session can call any program (unrestricted).
+- `program_count = 0` — unrestricted: the session key can pay **any address** up to its limits.
+- `program_count > 0` — spends must arrive by CPI from a listed program, signed by that program's `["vow_caller"]` PDA.
+- `daily_limit`, `lifetime_limit`, or `velocity_limit = 0` — no limit of that type. Daily counters reset at 00:00 UTC.
 - Sessions are invalidated automatically when the user calls `activate_stake` or `complete_unstake` — on-chain enforcement, no manual cleanup needed.
 
 ---
 
 ## Cross-Device Portability
 
-Vow identity and sessions are stored on-chain. Nothing lives in localStorage that can't be recovered.
+Vow identity and session records are stored on-chain. Session **private keys** are not: Recoverable Session keys can be re-derived with a wallet signature, while One-Time keys cannot be recovered if lost.
 
 ### Retrieving an identity
 
@@ -148,7 +150,7 @@ The session PDA stores the **public key** of the session keypair. The private ke
 ```typescript
 const identities = await client.getVowStatesByOwner(userWallet.publicKey);
 if (identities.length === 0) {
-  // No identity — prompt user to mint at https://vow-protocol.vercel.app
+  // No identity — prompt user to mint at https://x1vow.xyz
   return;
 }
 const { publicKey: vowStatePubkey, account: identity } = identities[0];
@@ -215,20 +217,28 @@ const sessionClient = new VowClient(sessionProvider);
 use anchor_lang::prelude::*;
 
 pub fn process_action(ctx: Context<MyAction>, cost: u64) -> Result<()> {
+    // Vow does not restrict the destination. Your program must pin or validate it.
+    require_keys_eq!(ctx.accounts.treasury.key(), MY_TREASURY);
+
+    let bump = ctx.bumps.vow_caller;
+    let signer: &[&[&[u8]]] = &[&[b"vow_caller", &[bump]]];
     vow::cpi::yield_spend(
-        CpiContext::new(
+        CpiContext::new_with_signer(
             ctx.accounts.vow_program.to_account_info(),
             vow::cpi::accounts::YieldSpend {
                 config: ctx.accounts.vow_config.to_account_info(),
                 vow_state: ctx.accounts.vow_state.to_account_info(),
                 session_account: ctx.accounts.session_account.to_account_info(),
                 calling_program: ctx.accounts.my_program.to_account_info(),
-                app_registry: None,
+                // Required PDA ["app", my_program]; may be uninitialized.
+                app_registry: ctx.accounts.app_registry.to_account_info(),
                 reserve: ctx.accounts.vow_reserve.to_account_info(),
                 destination: ctx.accounts.treasury.to_account_info(),
                 session_signer: ctx.accounts.session_signer.to_account_info(),
                 system_program: ctx.accounts.system_program.to_account_info(),
+                caller_authority: Some(ctx.accounts.vow_caller.to_account_info()),
             },
+            signer,
         ),
         cost,
     )?;
@@ -236,7 +246,7 @@ pub fn process_action(ctx: Context<MyAction>, cost: u64) -> Result<()> {
 }
 ```
 
-The protocol verifies on-chain: session is active, `calling_program` is in the session's whitelist, daily and lifetime caps not exceeded, session has not been invalidated by a stake event.
+The protocol verifies on-chain: the session is active, unexpired, and not invalidated; `calling_program` is whitelisted and signed through its `vow_caller` PDA; the app is not blocked; and the spend limits hold.
 
 ### 6. Verify session validity before calling (off-chain)
 
@@ -258,7 +268,7 @@ async function isSessionValid(
     session.active &&
     identity.activeStake &&
     (session.expiryTs.toNumber() === 0 || now < session.expiryTs.toNumber()) &&
-    session.startTs.toNumber() > (identity as any).sessionsInvalidatedAt.toNumber()
+    session.startTs.toNumber() >= (identity as any).sessionsInvalidatedAt.toNumber()
   );
 }
 ```
@@ -271,8 +281,8 @@ Users choose how their staking yield is handled:
 
 | Mode | Behavior |
 |------|----------|
-| `Treasury` | 100% → `yield_balance`. Available to harvest or spend via sessions. |
-| `Hybrid` | 50% compounded into shares, 50% → `yield_balance`. |
+| `Treasury` | On harvest, 100% of the gain → `yield_balance` (shares worth the gain are burned). Withdrawable or spendable via sessions. |
+| `Hybrid` | On harvest, 50% stays in shares, 50% → `yield_balance`. |
 | `Compound` | 100% compounded. `yield_balance` always 0. Gain realized at unstake. |
 
 Switching modes calls `settle_idnft` first — existing gain is locked in at the current price before the mode changes.
@@ -291,8 +301,8 @@ All fields are readable directly from the `VowState` account. No oracle, no off-
 | `active_stake` | `bool` | Active vs Dormant |
 | `principal_lamports` | `u64` | Current staked amount |
 | `yield_balance` | `u64` | Spendable yield (lamports) |
-| `shares` | `u64` | Pool share position |
-| `accrued_gain` | `i64` | Pending gain since last harvest |
+| `shares` | `u128` | Pool share position |
+| `accrued_gain` | `i64` | Settled gain not yet harvested |
 | `yield_mode` | `enum` | Treasury / Hybrid / Compound |
 | `first_staked_at` | `i64` | Unix timestamp of first ever stake |
 | `unlock_at` | `i64` | When principal can be unstaked |
@@ -338,22 +348,24 @@ const [escrow] = findUnstakeEscrow(vowState); // seeds: ["unstake", vow_state]
 
 ## Authority Profiles (Default Session Parameters)
 
-dApps can publish an `AuthorityProfile` — a PDA that stores default session limits for their program. When a user creates a session referencing an authority profile, the session is pre-filled with the dApp's published defaults.
+A wallet can store its own `AuthorityProfile`: reusable session defaults for daily limit, lifetime limit, expiry, and allowed programs. `create_session` accepts only a profile owned by the signing wallet, so a dApp cannot publish one on behalf of its users. The SDK does not wrap these instructions; call them through `client.program.methods`.
+
+Values passed to `create_session` override the defaults. An empty `allowed_program_ids` inherits the profile's list, and `default_expiry_days = 0` means no expiry.
 
 ```typescript
-// dApp publishes defaults once
-await client.createAuthorityProfile(
-  profileId,   // 8-byte identifier you choose
-  {
+const profileId = Buffer.from("defaults"); // 8 bytes
+const [authorityProfile] = findAuthorityProfile(wallet.publicKey, profileId);
+
+await client.program.methods
+  .createAuthorityProfile([...profileId], {
     defaultDailyLimit: new BN(500_000_000),
-    defaultLifetimeLimit: new BN(0),  // 0 = no cap
+    defaultLifetimeLimit: new BN(5_000_000_000),
     defaultExpiryDays: 30,
     defaultAllowedProgramIds: [MY_PROGRAM_ID],
-  }
-);
-
-// User's session creation can reference the profile
-// Frontend pre-fills limits from the profile — user sees them before signing
+    metadataUri: Buffer.from(""),
+  })
+  .accountsStrict({ authorityProfile, wallet: wallet.publicKey, systemProgram: SystemProgram.programId })
+  .rpc();
 ```
 
 ---
@@ -364,11 +376,11 @@ These instructions require **no admin key** — anyone can call them:
 
 | Instruction | Who can call | What it does |
 |-------------|-------------|--------------|
-| `update_share_price` | Anyone, no signer | Sets the share price to **NAV / total_shares**, where NAV is what the protocol can actually pay out: reserve SOL + pXNT at the pool rate net of the withdrawal fee, minus everything owed (yield balances + pending unstakes). Records the pool's epoch and fees. Value-moving instructions (mint, add_stake, activate_stake, harvest, begin_unstake, update_yield_mode) fail with `PriceStale` unless this ran for the current epoch — clients prepend it to the same transaction. |
-| `flush_reserve_to_pool` | Anyone, no signer | Deposits only **idle** reserve SOL into the SPL stake pool. SOL backing yield balances and pending unstakes always stays liquid, so `yield_spend` / `withdraw_yield` / `complete_unstake` never get stranded. Referral-fee account is pinned to the reserve's own pXNT ATA. |
+| `update_share_price` | Anyone (fee payer only) | Sets the share price to **NAV / total_shares**, where NAV is what the protocol can actually pay out: reserve XNT + pXNT at the pool rate net of the withdrawal fee, minus everything owed (yield balances + pending unstakes). Records the pool's epoch and fees. Value-moving instructions (mint, add_stake, activate_stake, harvest, begin_unstake, update_yield_mode) fail with `PriceStale` unless this ran for the current epoch — clients prepend it to the same transaction. |
+| `flush_reserve_to_pool` | Anyone (fee payer only) | Deposits only **idle** reserve XNT into the X1 stake pool. XNT backing yield balances and pending unstakes always stays liquid, so `yield_spend` / `withdraw_yield` / `complete_unstake` never get stranded. Referral-fee account is pinned to the reserve's own pXNT ATA. |
 | `withdraw_from_pool` | Anyone, gated by need | Redeems just enough pXNT (grossed up for the pool fee) to cover what the protocol owes right now. Reverts with `ReserveSufficient` otherwise, so nobody can drain the position. Right after an epoch boundary the stake program briefly rejects withdrawals (`EpochRewardsActive`, 0x10) — retry. |
-| `harvest` | Anyone, no signer | Settles pending gain for an identity and credits `yield_balance`. No owner signature required — games and dApps can crank this permissionlessly. |
-| `deposit_yield_balance` | Anyone, no signer | Deposits XNT into the reserve and credits an identity's `yield_balance`. Session keys, dApp servers, or users can call this to seed spending before yield accrues. |
+| `harvest` | Anyone (fee payer only) | Settles pending gain for an identity and applies its yield mode. No owner signature required — games and dApps can crank this permissionlessly. |
+| `deposit_yield_balance` | Any depositor (signs and pays) | Deposits XNT into the reserve and credits an identity's `yield_balance`. Session keys, dApp servers, or users can call this to seed spending before yield accrues. |
 
 ### What actually requires admin
 
@@ -378,8 +390,8 @@ Only these instructions check `config.admin` and require its signature:
 |-------------|-----------|
 | `initialize` | One-time setup — must be signed by the program's **upgrade authority**; sets `config.admin` to the signer |
 | `set_admin` | Transfers admin to a new key — the **new admin must co-sign** (`scripts/set_admin.ts`) |
-| `verify_app` / `block_app` | App registry curation |
-| `dev_set_share_price` | Testnet only — blocked when real SPL pool is configured |
+| `verify_app` / `block_app` | App registry curation. `block_app` stops whitelisted spends through that app; it does not constrain unrestricted sessions, which can name any program |
+| `set_mint_counter` / `dev_set_share_price` / `dev_fast_unlock` | Testnet only — blocked when real SPL pool is configured |
 
 Current protocol admin: `BPmZB128HNvmzubP4rwJTTNLmk9ucK71Jtqt7MowKV8M`  
 Same key as the program upgrade authority (`~/.config/solana/vow-key.json`).
@@ -419,6 +431,7 @@ while (true) {
   const task = await pollForTask();
   if (task) {
     await agentProgram.methods.executeTask(task.id)
+      // agentProgram validates the payment and CPIs into yield_spend with its vow_caller PDA
       .accounts({ vowState: vowStatePubkey, sessionAccount: agentSessionPda, ... })
       .signers([agentKeypair])
       .rpc();
@@ -436,15 +449,15 @@ Multi-agent pattern: one session per agent (index 0 = browser, 1 = trading bot, 
 # Build program
 anchor build
 
-# Run tests (starts local validator automatically)
-anchor test
+# Tests (throwaway validators on port 28899+)
+anchor test                     # core suite (12)
+tests/run-local-tests.sh        # core + CPI + audit regression suites (27)
+tests/run-mainnet-fork-test.sh  # clones the live pool and identities; fair-share checks
+cargo test -p vow --lib         # NAV math unit tests (7)
 
-# Sync IDL to frontend SDK after build
-cp target/idl/vow.json frontend/src/sdk/vow.json
-cp target/types/vow.ts frontend/src/sdk/vow-types.ts
+# Sync IDL + SDK after build (frontend/src/sdk is the source of truth)
+scripts/sync-idl.sh
 ```
-
-Tests cover: initialize, mint, share price mechanics, harvest, sessions, soulbound invariants, security edge cases. 34 tests, all passing.
 
 ---
 
@@ -464,6 +477,17 @@ RPC=https://rpc.mainnet.x1.xyz \
   --compiler-options '{"resolveJsonModule":true,"esModuleInterop":true}' \
   scripts/initialize-protocol.ts
 ```
+
+### Frontend hosting
+
+The frontend is served from https://x1vow.xyz by nginx.
+
+```bash
+sudo bash deploy/install-x1vow.sh   # nginx site + TLS certificate (safe to re-run)
+deploy/publish-frontend.sh          # build from the lockfile and switch releases atomically
+```
+
+The former Vercel URLs are redirect-only (`deploy/vercel-redirect`).
 
 ### Live mainnet PDAs
 
@@ -486,12 +510,14 @@ programs/vow/src/
   instructions/
     admin/          — initialize, set_admin, verify_app, dev helpers
     pool/           — update_share_price, flush_reserve_to_pool, withdraw_from_pool
-    vow/            — mint, add_stake, activate_stake, begin_unstake, complete_unstake
+    vow/            — mint, add_stake, activate_stake, begin_unstake, complete_unstake,
+                      update_yield_mode, backfill_owner_index
     session/        — create_session, revoke_session, close_session
     treasury/       — yield_spend, withdraw_yield, deposit_yield_balance
     harvest.rs      — settle and credit accrued gain
     commitment/     — record_commitment, record_fulfillment (reputation)
     authority_profile/ — dApp default session params
+  pool_math.rs      — stake-pool parsing and NAV share-price math
   state/            — all account structs
   errors.rs
   constants.rs
@@ -506,6 +532,8 @@ scripts/
   initialize-protocol.ts
   check_yield.ts
 
-tests/              — 34 anchor tests
+tests/              — core, CPI, and mainnet-fork suites
 docs/               — spec, integration guide, pool-share model, commitment model
+frontend/           — reference web app
+deploy/             — nginx, TLS, publish, and redirect configuration
 ```

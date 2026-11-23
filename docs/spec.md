@@ -1,178 +1,150 @@
 # Vow Protocol Specification
 
-**X1 Network (SVM)** | Status: Active (testnet)
+**X1 Network (SVM)** | Status: live on X1 mainnet | Anchor crate: `vow`
 
----
+> **Vow is the user.** A Vow identity is a soulbound, stake-backed credential. It cannot be transferred or sold, and its account is never closed.
 
-## Design Principle
+## Deployment
 
-> **Vow is the user.**
-
-Vow Protocol is a soulbound identity primitive. It is not a financial instrument. It cannot be transferred, sold, or traded. It exists as a permanent on-chain credential tied to the wallet that created it.
-
----
-
-## Program ID
-
-```
-HRwze7aVokE5fjfm2qVn9rVq5CAAFiD3BPEFMGei8edF
-```
-
-RPC: `https://rpc.testnet.x1.xyz`
-Frontend: `https://vow-protocol.vercel.app`
-Source: `/home/owlx1/IDNFT/`
-
-### Testnet State
-- Protocol initialized ✅
-- Config PDA: `2VnPbGXq2j51T9a6jimsTD6amT7u1rr3YCZ4sM8JZjjQ`
-- StakePool PDA: `8wVC62cWYKMv5MKH8pmtLufdYnVZcByTbd532kTZJWTM`
-- Reserve PDA: `4vurpNAWAgYoRKoDsE22tynHthWx9eoaB8peeyXdDcy6`
-- Validators: 0 (run `add-validator.ts` to register)
-
-### After a new deploy, run in order:
-```bash
-cd /home/owlx1/IDNFT
-npx ts-node --skip-project scripts/initialize-protocol.ts
-npx ts-node --skip-project scripts/add-validator.ts
-npx ts-node --skip-project scripts/activate-stake.ts
-```
-
----
+| Item | Value |
+|---|---|
+| Program | `7ytRMwKykiJnbT3gdLXPCUZMzrTNZZbr7m2i7fwiyjbJ` |
+| Config PDA | `2EeU6bRB248wEZquPPoSPyJLa5Ps93p3ubvQayq3UyBe` |
+| Reserve PDA | `4mn9erFousBJp1NWCfCosZVjoatHnD16pZTN3K6t1pqC` |
+| Stake pool | `X1SPaMUM1A8E1vKL8XQAB5rxKarJbqtWFFSNFs8f7Av` |
+| Stake pool program | `XPoo1Fx6KNgeAzFcq2dPTo95bWGUSj5KdPVqYj9CZux` |
+| pXNT mint | `pXNTyoqQsskHdZ7Q1rnP25FEyHHjissbs7n6RRN2nP5` |
+| X1 ATA program | `ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL` |
+| Admin and upgrade authority | `BPmZB128HNvmzubP4rwJTTNLmk9ucK71Jtqt7MowKV8M` |
+| RPC | `https://rpc.mainnet.x1.xyz` |
+| Frontend | `https://x1vow.xyz` |
 
 ## Relationship to xNFT
 
 | Concern | Vow Protocol | xNFT |
 |---|---|---|
-| Transferable | No (soulbound) | Yes |
-| Session authority | Yes | No (legacy only) |
-| App-scoped permissions | Yes | No |
+| Transferable | No | Yes |
+| Session authority | Yes | No |
 | On-chain reputation | Yes | No |
 | Yield-bearing | Yes | Yes |
-| Staking pool | Shared | Shared |
 | Permanent credential | Yes | No (closes on redeem) |
 | Marketplace | No | Yes |
 
----
+## Identity lifecycle
 
-## Identity Lifecycle
-
-A Vow identity has two states:
-
-```
-Active Identity   (active_stake = true)
-  Sessions allowed, yield spendable, stake backing the identity
-
-Dormant Identity  (active_stake = false)
-  No new sessions, yield spending blocked,
-  full history and reputation preserved,
-  can be re-activated via activate_stake()
+```text
+mint_vow ──► Active ──(lock elapsed)──► begin_unstake ──(next epoch)──► complete_unstake ──► Dormant
+               ▲  │                                                                            │
+               │  └─ add_stake (re-locks whole position)                                       │
+               └───────────────────────────────── activate_stake ◄─────────────────────────────┘
 ```
 
-The identity account itself is **never closed**. It exists permanently on-chain as a credential regardless of stake state.
+- **Active** (`active_stake = true`): sessions allowed and yield spendable.
+- **Unstaking**: `active_stake` stays true, but `shares = 0`, `yield_balance = 0`, and an `UnstakeEscrow` holds the fixed payout.
+- **Dormant** (`active_stake = false`): no new sessions or spends. History is preserved.
 
----
+Each wallet can mint one identity, enforced by `OwnerIndex`. Two legacy wallets minted several before enforcement and keep them; their index points at the oldest identity.
 
 ## Instructions
 
-### Identity
+### Identity and stake
 
-| Instruction | Description |
+| Instruction | Signer | Behavior |
+|---|---|---|
+| `mint_vow` | Owner | Creates identity and `OwnerIndex`. Needs a fresh price and at least 1 XNT. |
+| `add_stake` | Owner | Buys more shares. **Re-locks the whole position** for the new class and clears `matured`. |
+| `activate_stake` | Owner | Dormant to Active with new stake and lock. Invalidates older sessions. |
+| `begin_unstake` | Owner | Requires maturity. Fixes payout at `shares × price + yield_balance`. |
+| `complete_unstake` | Owner | From the next epoch, pays the exact amount or reverts `ReserveIlliquid`. Paused while insolvent. Sets Dormant. |
+| `update_yield_mode` | Owner | Settles at a fresh price, then changes mode. |
+| `harvest` | Anyone | Settles gain and applies the yield mode. |
+| `backfill_owner_index` | Anyone | Creates the index for a pre-enforcement identity. |
+
+### Sessions and yield
+
+| Instruction | Signer | Behavior |
+|---|---|---|
+| `create_session` | Owner | Creates a session at a chosen index. |
+| `revoke_session` | Owner | Sets `active = false`. |
+| `close_session` | Owner | Reclaims rent if expired, revoked, invalidated, or the identity is dormant. |
+| `yield_spend` | Session key | Pays from `yield_balance`, subject to all session checks. Paused while insolvent. |
+| `deposit_yield_balance` | Depositor | Credits any active identity that is not unstaking. |
+| `withdraw_yield` | Owner | Withdraws `yield_balance` to the owner. Paused while insolvent. |
+| `record_commitment`, `record_fulfillment` | Owner | One-time commitment record updates per identity. |
+| `create/update/close_authority_profile` | Profile wallet | Stores that wallet's session defaults. |
+
+### Pool cranks (permissionless)
+
+| Instruction | Behavior |
 |---|---|
-| `mint_idnft` | Create a new Vow identity with an initial stake deposit. Sets `active_stake = true`. |
-| `activate_stake` | Transition Dormant → Active. Deposits new stake. Requires `!active_stake`. |
-| `begin_unstake` | Initiate unstake. Requires maturity. Creates `UnstakeEscrow`. |
-| `complete_unstake` | Finalize unstake. Withdraws principal + yield. Sets `active_stake = false`. Identity persists. |
-| `harvest` | Settle accrued gain from share price delta. |
-| `update_yield_mode` | Change Compound / Hybrid / Treasury. Requires `active_stake`. |
-| `withdraw_yield` | Withdraw `yield_balance` to wallet. |
+| `update_share_price` | Sets NAV price and records pool epoch and fees. Halts value-moving instructions if insolvent. |
+| `flush_reserve_to_pool` | Deposits only idle XNT into the stake pool. |
+| `withdraw_from_pool` | Redeems enough pXNT to cover current obligations, otherwise reverts `ReserveSufficient`. |
 
-### Sessions
+### Admin
 
-| Instruction | Description |
-|---|---|
-| `create_session` | Create a session key with program allowlist and spend limits. Requires `active_stake`. `program_count == 0` means any program allowed. `expiry_ts == 0` means no expiry. |
-| `revoke_session` | Mark a session inactive. Owner only. |
-| `close_session` | Reclaim rent. Allowed when expired, revoked, invalidated, or identity dormant. |
-| `yield_spend` | CPI endpoint — authorized program spends yield on behalf of identity owner via session key. |
+| Instruction | Authority | Behavior |
+|---|---|---|
+| `initialize` | Upgrade authority | One-time setup. |
+| `set_admin` | Admin + new admin | Both must sign. |
+| `register_app` | Anyone | Creates a registry entry with no privileges. |
+| `verify_app` | Admin | Sets a display flag. Not checked by `yield_spend`. |
+| `block_app` | Admin | Rejects spends naming that program. |
+| `set_mint_counter`, `dev_set_share_price`, `dev_fast_unlock` | Admin | Rejected when a stake pool is configured. |
 
-### Admin / Pool
+There is no pause instruction. A program upgrade is the only kill switch.
 
-Same as xNFT: `initialize`, `add_validator`, `remove_validator`, `score_validator`, `update_share_price`, `flush_reserve_to_pool`, `rebalance_pool`, `initialize_pool_stake`, `delegate_pool_stake`, `deactivate_pool_stake`, `withdraw_stake_to_reserve`.
+## Session rules
 
----
+Session PDA: `["session", vow_state, session_index_le4]`.
 
-## Soulbound Invariants
+`yield_spend` requires all of the following:
 
-1. `IdNftState.owner` is set at mint and **never changes**
-2. The `IdNftState` account is **never closed**
-3. There is **no transfer instruction**
-4. There is no ownership migration of any kind
-5. No marketplace integration code exists in this program
+1. The signer equals `session.session_key`, and `session.active` is true.
+2. `expiry_ts == 0` or `now < expiry_ts`.
+3. `start_ts >= vow.sessions_invalidated_at`, and the identity is active.
+4. `calling_program` is executable.
+5. If `program_count > 0`, the program is listed **and** its `["vow_caller"]` PDA signed, which proves the spend arrived by CPI from that program.
+6. The `["app", calling_program]` registry is not blocked. An unregistered app is allowed.
+7. Daily, lifetime, and velocity limits hold. A limit of `0` means no limit. Counters reset at 00:00 UTC.
+8. `yield_balance` covers the amount, and the reserve keeps its rent floor.
 
----
+An **unrestricted** session (`program_count == 0`) can pay any destination up to its limits. Vow does not constrain the destination in any mode, so whitelisted programs must validate it themselves.
 
-## Session Key Design
+When a session uses an `AuthorityProfile`, zero-valued daily limit, lifetime limit, and expiry inherit the profile's defaults, and an empty program list inherits the profile's list. `default_expiry_days = 0` means no expiry.
 
-Session PDAs are derived from `[b"session", idnft_state, session_index_le4]` — using a **user-chosen u32 index** rather than the session key pubkey. This enables deterministic recovery: any device with the wallet seed can enumerate all session slots without scanning the chain.
-
-- `session_index` is chosen by the user (0, 1, 2, …)
-- `expiry_ts == 0` means the session never expires
-- `program_count == 0` means the session is unrestricted (any executable program may call yield_spend)
-- `program_count > 0` restricts yield_spend to the listed program IDs only
-
----
-
-## Reputation Layer
-
-These fields in `IdNftState` are **append-only** — never reset by unstake or activate_stake:
-
-| Field | Description |
-|---|---|
-| `first_staked_at` | Unix timestamp of original mint. Immutable. |
-| `total_commitments` | Count of mint + activate_stake calls. |
-| `total_fulfilled` | Count of complete_unstake calls where matured == true. |
-| `cumulative_stake_days` | Running total days with active stake. Updated at each unstake. |
-| `highest_class_ever` | Best class tier ever achieved. Only ever increases. |
-
----
+Invalidation sets `sessions_invalidated_at` strictly after the current time, and new sessions start at or after it, so no earlier session survives, even within the same second.
 
 ## Classes
 
-| Class | Name | Min XNT | Max XNT | Lock (days) |
-|---|---|---|---|---|
-| 0 | Ruby | 1 | 100 | 30 |
-| 1 | Opal | 101 | 300 | 90 |
-| 2 | Topaz | 301 | 500 | 180 |
-| 3 | Emerald | 501 | 1,000 | 365 |
-| 4 | Aquamarine | 1,001 | 2,000 | 547 |
-| 5 | Sapphire | 2,001 | 5,000 | 730 |
-| 6 | Amethyst | 5,001 | 10,000 | 1,095 |
-| 7 | Xenturion | 10,001+ | unlimited | 1,825 |
+| Class | Name | XNT (whole units) | Lock |
+|---|---|---|---|
+| 0 | Ruby | 1–100 | 30 days |
+| 1 | Opal | 101–300 | 90 days |
+| 2 | Topaz | 301–500 | 180 days |
+| 3 | Emerald | 501–1,000 | 365 days |
+| 4 | Aquamarine | 1,001–2,000 | 547 days |
+| 5 | Sapphire | 2,001–5,000 | 730 days |
+| 6 | Amethyst | 5,001–10,000 | 1,095 days |
+| 7 | Xenturion | 10,001+ | 1,825 days |
 
-`class` reflects the current stake tier. `highest_class_ever` persists the historical maximum.
+Class uses principal rounded down to whole XNT.
 
----
-
-## PDA Seeds
+## PDA seeds
 
 | Account | Seeds |
 |---|---|
 | ProtocolConfig | `["config"]` |
-| StakePool | `["stake_pool"]` |
 | Reserve | `["reserve"]` |
-| ValidatorEntry | `["validator", vote_account]` |
-| PoolStake | `["pool_stake", vote_account]` |
-| PoolAuthority | `["pool_authority"]` |
-| IdNftAssetId | `["idnft_asset", nonce_le8]` |
-| IdNftState | `["idnft", asset_id]` |
-| UnstakeEscrow | `["unstake", idnft_state]` |
-| SessionAccount | `["session", idnft_state, session_index_le4]` |
-| AuthorityProfile | `["authority_profile", wallet, profile_id]` |
+| VowAssetId | `["vow_asset", nonce_le8]` |
+| VowState | `["vow", asset_id]` |
+| UnstakeEscrow | `["unstake", vow_state]` |
+| OwnerIndex | `["owner_index", wallet]` |
+| SessionAccount | `["session", vow_state, session_index_le4]` |
+| AuthorityProfile | `["authority_profile", wallet, profile_id_8]` |
 | AppRegistry | `["app", program_id]` |
 | CommitmentRecord | `["commitment", wallet]` |
+| Commitment gates | `["cr_commit" or "cr_fulfill", commitment_record, vow_state]` |
+| dApp CPI signer | `["vow_caller"]` under the dApp's program |
 
----
-
-## Survivability
-
-All state is on-chain. Any developer can rebuild tooling from the IDL alone.
+See [pool-share-model.md](pool-share-model.md) for accounting, [commitment-model.md](commitment-model.md) for reputation, and [integration.md](integration.md) for dApp integration.

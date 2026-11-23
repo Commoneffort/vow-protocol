@@ -1,89 +1,55 @@
-# IDNFT Identity Model
+# Vow Identity and Commitment Model
 
-## What an IDNFT Represents
+A Vow identity is a permanent soulbound credential backed by a stake position.
 
-An IDNFT is a **permanent soulbound identity credential** backed by a stake position.
-
-It is not a financial instrument. It cannot be transferred.
-
-```
-IDNFT identity structure:
-
+```text
 Wallet (permanent owner)
-└── IdNftState (never closed)
-    ├── Stake Position — pool shares while Active
-    ├── Yield Balance — crystallised yield claim
-    ├── Sessions — delegated app authority (Active only)
-    └── Reputation Layer — append-only historical record
-        ├── first_staked_at
-        ├── total_commitments
-        ├── total_fulfilled
-        ├── cumulative_stake_days
-        └── highest_class_ever
+├── OwnerIndex: the wallet's canonical identity
+└── VowState (never closed)
+    ├── Stake position: pool shares while Active
+    ├── Yield balance: fixed XNT claim
+    ├── Sessions: delegated spending authority
+    └── Reputation: historical record
 ```
 
----
+## Reputation on VowState
 
-## Lifecycle
+These fields are the most reliable reputation signal because only the identity's own stake lifecycle updates them.
 
+| Field | Updated by | Meaning |
+|---|---|---|
+| `first_staked_at` | `mint_vow` | Original mint time. Immutable. |
+| `total_commitments` | `mint_vow`, `activate_stake` | Stake cycles started. |
+| `total_fulfilled` | `complete_unstake` when matured | Stake cycles held to maturity. |
+| `cumulative_stake_days` | `complete_unstake` | Days staked across completed cycles. |
+| `highest_class_ever` | `mint_vow`, `add_stake`, `activate_stake` | Peak class. Never decreases. |
+
+Top-ups do not increment `total_commitments`, but they do restart the lock. `cumulative_stake_days` updates only at unstake, so it excludes the current cycle.
+
+## CommitmentRecord
+
+`CommitmentRecord` (`["commitment", wallet]`) is an optional wallet-level summary:
+
+```text
+score = highest_class × 100 + min(identities_recorded, 50) × 10 + fulfilled_ratio
+fulfilled_ratio = min(fulfilled, committed) × 100 / committed
 ```
-mint_idnft()
-    → Active Identity (active_stake = true)
-    → Sessions can be created
-    → Yield accrues
 
-begin_unstake() + complete_unstake()
-    → Dormant Identity (active_stake = false)
-    → Principal + yield returned to wallet
-    → All sessions invalidated
-    → IdNftState stays on-chain with full history
+- `record_commitment` snapshots the identity's current principal and class. It can run once per identity.
+- `record_fulfillment` adds the current principal if the identity is matured. It can run once per identity.
+- **Both require the identity owner's signature**, so nobody else can freeze a record at a low value.
 
-activate_stake()
-    → Active Identity again
-    → New stake, new lock period
-    → Old sessions invalidated (fresh start)
-    → Reputation fields increment; never reset
-```
+The owner chooses when to record, so treat `commitment_score` as a display metric. For access control or financial decisions, use the `VowState` fields.
 
----
+## Principal and sessions
 
-## Reputation: What Never Resets
+Sessions can spend only `yield_balance`. They cannot unstake, withdraw the position, change yield mode, or manage sessions.
 
-| Field | Set by | Updated by | Never reset by |
-|---|---|---|---|
-| `first_staked_at` | `mint_idnft` | — (immutable) | anything |
-| `total_commitments` | `mint_idnft` (=1) | `activate_stake` (+1) | unstake |
-| `total_fulfilled` | — | `complete_unstake` if matured | activate_stake |
-| `cumulative_stake_days` | — | `complete_unstake` (+=days) | activate_stake |
-| `highest_class_ever` | `mint_idnft` | `activate_stake` if higher | anything |
+`yield_balance` holds harvested gain plus any direct deposits. After a price drop, harvest credits nothing until the position recovers past its previous value.
 
-A Xenturion IDNFT (class 7) with `total_fulfilled = 3` proves:
-- The holder committed 10,001+ XNT at least three times
-- Each time holding to maturity (1,825+ days)
-- From the same wallet, across multiple stake cycles
-- All verifiable on-chain, permanently
+Sessions stop working when:
 
----
-
-## Principal Protection
-
-`principal_lamports` represents the most recent stake deposit. It is **never directly spendable** via sessions.
-
-Only `yield_balance` can be accessed via `yield_spend()` (session-gated) or `withdraw_yield()` (owner-gated).
-
-`yield_balance` = crystallised yield only. `harvest()` must be called first.
-
----
-
-## Session Scope
-
-Sessions are scoped to specific SVM programs (`allowed_program_ids`). A session cannot:
-- Access principal
-- Spend more than its `daily_limit` or `lifetime_limit`
-- Call a program not in its allowlist
-- Be used by anyone other than the holder of the session keypair
-- Be created when `active_stake = false`
-
-Sessions are invalidated automatically when:
-- `complete_unstake()` is called (identity goes dormant)
-- `activate_stake()` is called (new stake cycle begins)
+- the owner revokes them,
+- they expire,
+- `complete_unstake` makes the identity dormant, or
+- `activate_stake` starts a new cycle.
