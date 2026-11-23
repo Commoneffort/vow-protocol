@@ -51,8 +51,6 @@ yarn-error.log
 wallet.json
 .claude/
 
-# Unpatched-findings report: keep private while its issues are open (public repo)
-AUDIT-2026-11-23.md
 
 # Test-only CPI fixture build output
 tests/fixtures/*/target/

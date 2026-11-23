@@ -47,7 +47,7 @@ await client.completeUnstake(vowState);   // next epoch; redeems pXNT if needed
 await client.activateStake(vowState, 5 * LAMPORTS_PER_XNT, { compound: {} });
 ```
 
-The SDK prepends `update_share_price` to value-moving instructions. If you build transactions yourself, prepend `await client.freshPriceIxs()` or they revert with `PriceStale`.
+The SDK prepends `update_share_price` to value-moving instructions and owner payouts. If you build transactions yourself, including every `yield_spend` CPI, prepend `await client.freshPriceIxs()` or they can revert with `PriceStale` after an epoch boundary.
 
 ## Create a session
 

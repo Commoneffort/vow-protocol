@@ -55,7 +55,7 @@ Each wallet can mint one identity, enforced by `OwnerIndex`. Two legacy wallets 
 | `add_stake` | Owner | Buys more shares. **Re-locks the whole position** for the new class and clears `matured`. |
 | `activate_stake` | Owner | Dormant to Active with new stake and lock. Invalidates older sessions. |
 | `begin_unstake` | Owner | Requires maturity. Fixes payout at `shares × price + yield_balance`. |
-| `complete_unstake` | Owner | From the next epoch, pays the exact amount or reverts `ReserveIlliquid`. Paused while insolvent. Sets Dormant. |
+| `complete_unstake` | Owner | From the next epoch, pays the exact amount or reverts `ReserveIlliquid`. Needs this epoch's solvency check. Paused while insolvent. Sets Dormant. |
 | `update_yield_mode` | Owner | Settles at a fresh price, then changes mode. |
 | `harvest` | Anyone | Settles gain and applies the yield mode. |
 | `backfill_owner_index` | Anyone | Creates the index for a pre-enforcement identity. |
@@ -67,9 +67,9 @@ Each wallet can mint one identity, enforced by `OwnerIndex`. Two legacy wallets 
 | `create_session` | Owner | Creates a session at a chosen index. |
 | `revoke_session` | Owner | Sets `active = false`. |
 | `close_session` | Owner | Reclaims rent if expired, revoked, invalidated, or the identity is dormant. |
-| `yield_spend` | Session key | Pays from `yield_balance`, subject to all session checks. Paused while insolvent. |
-| `deposit_yield_balance` | Depositor | Credits any active identity that is not unstaking. |
-| `withdraw_yield` | Owner | Withdraws `yield_balance` to the owner. Paused while insolvent. |
+| `yield_spend` | Session key | Pays from `yield_balance`, subject to all session checks. Needs this epoch's solvency check. Paused while insolvent. |
+| `deposit_yield_balance` | Depositor | Credits any active identity that is not unstaking. Rejected while insolvent. |
+| `withdraw_yield` | Owner | Withdraws `yield_balance` to the owner. Needs this epoch's solvency check. Paused while insolvent. |
 | `record_commitment`, `record_fulfillment` | Owner | One-time commitment record updates per identity. |
 | `create/update/close_authority_profile` | Profile wallet | Stores that wallet's session defaults. |
 
@@ -108,6 +108,7 @@ Session PDA: `["session", vow_state, session_index_le4]`.
 6. The `["app", calling_program]` registry is not blocked. An unregistered app is allowed.
 7. Daily, lifetime, and velocity limits hold. A limit of `0` means no limit. Counters reset at 00:00 UTC.
 8. `yield_balance` covers the amount, and the reserve keeps its rent floor.
+9. The protocol is not paused for insolvency, and its solvency was checked this epoch. Prepend `update_share_price`.
 
 An **unrestricted** session (`program_count == 0`) can pay any destination up to its limits. Vow does not constrain the destination in any mode, so whitelisted programs must validate it themselves.
 

@@ -376,7 +376,7 @@ These instructions require **no admin key** — anyone can call them:
 
 | Instruction | Who can call | What it does |
 |-------------|-------------|--------------|
-| `update_share_price` | Anyone (fee payer only) | Sets the share price to **NAV / total_shares**, where NAV is what the protocol can actually pay out: reserve XNT + pXNT at the pool rate net of the withdrawal fee, minus everything owed (yield balances + pending unstakes). Records the pool's epoch and fees. Value-moving instructions (mint, add_stake, activate_stake, harvest, begin_unstake, update_yield_mode) fail with `PriceStale` unless this ran for the current epoch — clients prepend it to the same transaction. |
+| `update_share_price` | Anyone (fee payer only) | Sets the share price to **NAV / total_shares**, where NAV is what the protocol can actually pay out: reserve XNT + pXNT at the pool rate net of the withdrawal fee, minus everything owed (yield balances + pending unstakes). Records the pool's epoch and fees. Value-moving instructions (mint, add_stake, activate_stake, harvest, begin_unstake, update_yield_mode) fail with `PriceStale` unless this ran for the current epoch — clients prepend it to the same transaction. Payouts (`yield_spend`, `withdraw_yield`, `complete_unstake`) require the same refresh, so a new epoch's loss is seen before anyone is paid. |
 | `flush_reserve_to_pool` | Anyone (fee payer only) | Deposits only **idle** reserve XNT into the X1 stake pool. XNT backing yield balances and pending unstakes always stays liquid, so `yield_spend` / `withdraw_yield` / `complete_unstake` never get stranded. Referral-fee account is pinned to the reserve's own pXNT ATA. |
 | `withdraw_from_pool` | Anyone, gated by need | Redeems just enough pXNT (grossed up for the pool fee) to cover what the protocol owes right now. Reverts with `ReserveSufficient` otherwise, so nobody can drain the position. Right after an epoch boundary the stake program briefly rejects withdrawals (`EpochRewardsActive`, 0x10) — retry. |
 | `harvest` | Anyone (fee payer only) | Settles pending gain for an identity and applies its yield mode. No owner signature required — games and dApps can crank this permissionlessly. |
@@ -433,6 +433,7 @@ while (true) {
     await agentProgram.methods.executeTask(task.id)
       // agentProgram validates the payment and CPIs into yield_spend with its vow_caller PDA
       .accounts({ vowState: vowStatePubkey, sessionAccount: agentSessionPda, ... })
+      .preInstructions(await client.freshPriceIxs()) // payouts need this epoch's price
       .signers([agentKeypair])
       .rpc();
   }
@@ -453,7 +454,7 @@ anchor build
 anchor test                     # core suite (12)
 tests/run-local-tests.sh        # core + CPI + audit regression suites (27)
 tests/run-mainnet-fork-test.sh  # clones the live pool and identities; fair-share checks
-cargo test -p vow --lib         # NAV math unit tests (7)
+cargo test -p vow --lib         # NAV math unit tests (8)
 
 # Sync IDL + SDK after build (frontend/src/sdk is the source of truth)
 scripts/sync-idl.sh

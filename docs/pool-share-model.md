@@ -35,6 +35,8 @@ A deposit that would mint zero shares is rejected. With today's 0.1% fees, a new
 
 `mint_vow`, `add_stake`, `activate_stake`, `harvest`, `begin_unstake`, and `update_yield_mode` revert with `PriceStale` unless `update_share_price` recorded the current epoch. The SDK prepends that instruction.
 
+`yield_spend`, `withdraw_yield`, and `complete_unstake` require the same update for their solvency check, so a loss in a new epoch is seen before anyone is paid.
+
 The recorded epoch is the pool's `last_update_epoch`, so these instructions also wait for the X1 Foundation's epoch update of the pool.
 
 ## Harvest
@@ -72,4 +74,4 @@ The daily crank (`scripts/daily_crank.ts`, via the `vow-crank` systemd timer) ru
 
 ## Insolvency
 
-If liabilities exceed all assets, `update_share_price` keeps the old price and sets `price_epoch = 0`, which halts every freshness-gated instruction. If the deficit exceeds 0.001 XNT it also sets `config.insolvent`, which pauses `yield_spend`, `withdraw_yield`, and `complete_unstake` so early claimants cannot drain what remains. The next `update_share_price` that finds the protocol solvent clears both. The pause is not a settlement: if a deficit is permanent, resolving it needs a program upgrade.
+If liabilities exceed all assets, `update_share_price` keeps the old price and sets `price_epoch = 0`, which halts every freshness-gated instruction. If assets valued before pool fees fall short by more than 0.001 XNT, it also sets `config.insolvent`, which pauses `yield_spend`, `withdraw_yield`, and `complete_unstake` and rejects `deposit_yield_balance`, so early claimants cannot drain what remains. A pool fee change alone halts value-moving instructions but does not pause payouts. The next `update_share_price` that finds the protocol solvent clears both. The pause is not a settlement: if a deficit is permanent, resolving it needs a program upgrade.
