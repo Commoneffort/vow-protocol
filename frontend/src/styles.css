@@ -142,6 +142,7 @@ button:disabled { cursor: not-allowed; }
 .ws-sub { font-size: 11.5px; color: var(--muted); line-height: 1.35; }
 
 .ws-identity { --accent: #6d4bd1; --accent-soft: #f0ecfb; }
+.ws-topup { --accent: #c47f00; --accent-soft: #fdf4e2; }
 .ws-stake { --accent: #b3263f; --accent-soft: #fcedf0; }
 .ws-yield { --accent: #0d8a5b; --accent-soft: #e7f6f0; }
 .ws-sessions { --accent: #1f62d0; --accent-soft: #e9f1fd; }
@@ -258,7 +259,7 @@ button:disabled { cursor: not-allowed; }
 @media (max-width: 1040px) {
   .workspace { grid-template-columns: 1fr; }
   .rail { position: static; }
-  .ws-nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .ws-nav { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .ws-sub { display: none; }
   .hero-inner { grid-template-columns: 1fr; padding-top: 52px; }
   .card-fan { height: 400px; }
@@ -269,6 +270,8 @@ button:disabled { cursor: not-allowed; }
 @media (max-width: 720px) {
   .topbar { position: static; flex-wrap: wrap; padding: 10px 16px; gap: 8px 12px; }
   .ws-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ws-nav button:first-child { grid-column: span 2; }
+  .topup-choices { grid-template-columns: 1fr; }
   .topnav { order: 3; width: 100%; margin-left: 0; overflow-x: auto; }
   .net-pill { display: none; }
   .wallet-chip { max-width: 116px; overflow: hidden; text-overflow: ellipsis; }
@@ -293,3 +296,15 @@ button:disabled { cursor: not-allowed; }
   .panel input { width: 100% !important; margin-left: 0 !important; }
   .panel input[type="radio"], .panel input[type="checkbox"] { width: auto !important; }
 }
+
+/* Top up */
+.rail-topup { display: block; width: 100%; margin-top: 14px; padding: 10px 12px; border: 0; border-radius: 9px; background: #e3a72f; color: #1b1426; font-size: 13.5px; font-weight: 700; cursor: pointer; }
+.rail-topup:hover { background: #f0b63e; }
+.topup-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 18px; }
+.topup-choice { display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--text); text-decoration: none; box-shadow: var(--shadow); }
+.topup-choice:hover { border-color: var(--accent); }
+.topup-choice strong { font-size: 15px; }
+.topup-choice span:last-child { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+.topup-tag { align-self: flex-start; font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); background: var(--accent-soft); padding: 2px 8px; border-radius: 99px; }
+.ws-pointer { margin-top: 18px; padding: 10px 14px; border: 1px dashed var(--line); border-radius: 10px; font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ws-pointer button { border: 0; background: none; color: var(--accent); font-weight: 650; font-size: 13px; cursor: pointer; padding: 0; }

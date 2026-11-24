@@ -392,6 +392,8 @@ export default function App() {
   const [lastGenKp, setLastGenKp] = useState<{ pubkey: string; secret: string } | null>(null);
   // Portable session key derivation
   const [portableSession, setPortableSession] = useState(false);
+  // Sessions are app-locked unless the owner explicitly opts out.
+  const [allowAnyDestination, setAllowAnyDestination] = useState(false);
 
   const VOW_PROGRAM_ID = "7ytRMwKykiJnbT3gdLXPCUZMzrTNZZbr7m2i7fwiyjbJ";
   const LEGACY_ORIGIN = "https://vow-protocol.vercel.app";
@@ -418,7 +420,7 @@ export default function App() {
   // Restore a Recoverable Session key on a new device using the on-chain creation_nonce.
   // Reads creation_nonce from the SessionAccount, re-derives keypair, verifies pubkey match.
   const handleRestoreSessionKey = useCallback(async (vowAddr: string, sessionIndex: number, expectedPubkey: string, creationNonce: number) => {
-    setSessionStatus("Signing to restore key…");
+    setSessionStatus(`Signing to restore the key. Check your wallet: the message must read \"VOW Session Authorization\" with Domain: ${window.location.origin}. Never sign it on any other site.`);
     try {
       let kp = await deriveSessionKeypair(vowAddr, creationNonce);
       // Sessions created before the move to x1vow.xyz were derived under the old site address.
@@ -466,6 +468,10 @@ export default function App() {
     const addr = sessionIdnft || lastVowState;
     if (!addr) { setSessionStatus("Enter Vow identity address"); return; }
     const unrestricted = newPrograms.trim() === "";
+    if (unrestricted && !allowAnyDestination) {
+      setSessionStatus("Add the program address of the app this session is for, or tick \"Allow any destination\" if you hold the key yourself.");
+      return;
+    }
     const uncapped = newDailyLimitXnt === 0 && newLifetimeLimitXnt === 0;
     if ((unrestricted || uncapped) && !window.confirm(
       `${unrestricted ? "This session is UNRESTRICTED: its key can pay any address.\n" : ""}` +
@@ -482,7 +488,7 @@ export default function App() {
         setSessionStatus("Reading on-chain nonce…");
         const vowStateAcc = await client.getVowState(new PublicKey(addr));
         const creationNonce = (vowStateAcc.sessionNonce as BN).toNumber();
-        setSessionStatus("Waiting for wallet signature to derive recoverable key…");
+        setSessionStatus(`Waiting for your wallet signature. Check your wallet: the message must read \"VOW Session Authorization\" with Domain: ${window.location.origin}. Never sign it on any other site.`);
         genKp = await deriveSessionKeypair(addr, creationNonce);
         key = genKp.publicKey;
       } else {
@@ -521,13 +527,19 @@ export default function App() {
       }
       await loadSessions(addr);
     } catch (e: any) { setSessionStatus(fmtError(e)); }
-  }, [client, sessionIdnft, lastVowState, newSessionIndex, newSessionName, sessionNames, newSessionKey, newPrograms, newExpiryDays, newDailyLimitXnt, newLifetimeLimitXnt, newVelocityLimit, loadSessions, portableSession, deriveSessionKeypair]);
+  }, [client, sessionIdnft, lastVowState, newSessionIndex, newSessionName, sessionNames, newSessionKey, newPrograms, newExpiryDays, newDailyLimitXnt, newLifetimeLimitXnt, newVelocityLimit, loadSessions, portableSession, deriveSessionKeypair, allowAnyDestination]);
+
+  // A revoked or closed session's key is useless on-chain; don't leave it in storage.
+  const forgetSessionKey = (vowAddr: string, sessionIndex: number) => {
+    try { localStorage.removeItem(`vow_sk_${vowAddr}_${sessionIndex}`); } catch { /* storage unavailable */ }
+  };
 
   const handleRevokeSession = useCallback(async (vowAddr: string, sessionIndex: number) => {
     if (!client) return;
     try {
       await client.revokeSession(new PublicKey(vowAddr), sessionIndex);
-      setSessionStatus(`✓ Session #${sessionIndex} revoked`);
+      forgetSessionKey(vowAddr, sessionIndex);
+      setSessionStatus(`✓ Session #${sessionIndex} revoked — its key was deleted from this browser`);
       await loadSessions(vowAddr);
     } catch (e: any) { setSessionStatus(fmtError(e)); }
   }, [client, loadSessions]);
@@ -536,7 +548,8 @@ export default function App() {
     if (!client) return;
     try {
       await client.closeSession(new PublicKey(vowAddr), sessionIndex);
-      setSessionStatus(`✓ Session #${sessionIndex} closed — rent reclaimed`);
+      forgetSessionKey(vowAddr, sessionIndex);
+      setSessionStatus(`✓ Session #${sessionIndex} closed — rent reclaimed, key deleted from this browser`);
       await loadSessions(vowAddr);
     } catch (e: any) { setSessionStatus(fmtError(e)); }
   }, [client, loadSessions]);
@@ -564,7 +577,7 @@ export default function App() {
   }, [client, fundTarget, fundXnt]);
 
   // ── Active identity ─────────────────────────────────────────────────────
-  const [ws, setWs] = useState<"identity" | "stake" | "yield" | "sessions">("identity");
+  const [ws, setWs] = useState<"identity" | "topup" | "stake" | "yield" | "sessions">("identity");
   const [connectError, setConnectError] = useState("");
   const wasConnected = useRef(false);
 
@@ -607,9 +620,10 @@ export default function App() {
   const own = identity?._addr === lastVowState ? identity : null;
   const WORKSPACES = [
     { key: "identity", num: "01", title: "Identity", sub: "Your credential and record", lede: "The soulbound credential tied to your wallet, and the history it has earned.", tab: "#6d4bd1", soft: "#f0ecfb" },
-    { key: "stake", num: "02", title: "Stake", sub: "Commit, top up, or exit", lede: "Manage the capital behind your vow, from top-ups to a clean exit.", tab: "#b3263f", soft: "#fcedf0" },
-    { key: "yield", num: "03", title: "Yield", sub: "Harvest and withdraw", lede: "Turn staking rewards into a balance you can withdraw or let apps spend.", tab: "#0d8a5b", soft: "#e7f6f0" },
-    { key: "sessions", num: "04", title: "Sessions", sub: "Delegate with limits", lede: "Give apps and agents narrow, revocable authority over your yield.", tab: "#1f62d0", soft: "#e9f1fd" },
+    { key: "topup", num: "02", title: "Top up", sub: "Add XNT to your vow", lede: "Add XNT to your stake to earn more, or to your spending balance so apps can use it right away.", tab: "#c47f00", soft: "#fdf4e2" },
+    { key: "stake", num: "03", title: "Stake", sub: "Exit or reactivate", lede: "Unstake when your lock ends, or bring a dormant identity back to life.", tab: "#b3263f", soft: "#fcedf0" },
+    { key: "yield", num: "04", title: "Yield", sub: "Harvest and withdraw", lede: "Turn staking rewards into a balance you can withdraw or let apps spend.", tab: "#0d8a5b", soft: "#e7f6f0" },
+    { key: "sessions", num: "05", title: "Sessions", sub: "Delegate with limits", lede: "Give apps and agents narrow, revocable authority over your yield.", tab: "#1f62d0", soft: "#e9f1fd" },
   ] as const;
   const activeWs = WORKSPACES.find(w => w.key === ws)!;
 
@@ -720,6 +734,7 @@ export default function App() {
                   <div className="rail-stat"><span>Yield balance</span><span>{fmtXnt(own.yieldBalance, 4)}</span></div>
                   <div className="rail-stat"><span>Mode</span><span style={{ textTransform: "capitalize" }}>{Object.keys(own.yieldMode)[0]}</span></div>
                   <div className="rail-stat"><span>Vows kept</span><span>{own.totalFulfilled?.toString()} of {own.totalCommitments?.toString()}</span></div>
+                  <button className="rail-topup" onClick={() => setWs("topup")}>＋ Top up</button>
                 </>) : <div className="rail-status" style={{ marginBottom: 0 }}>No identity yet</div>}
               </div>
               <nav className="ws-nav" aria-label="Workspaces">
@@ -934,13 +949,58 @@ export default function App() {
           )}
         </div>
               </>)}
-              {ws === "stake" && lastVowState && (<>
-        {/* ── Add Stake ────────────────────────────────────────────────── */}
-        <div style={CARD}>
-          <h2 style={{ marginTop: 0 }}>Add Stake</h2>
+              {ws === "topup" && lastVowState && (<>
+        <div className="topup-choices">
+          <a href="#topup-balance" className="topup-choice">
+            <span className="topup-tag">Spend now</span>
+            <strong>Add to spending balance</strong>
+            <span>Usable by your sessions immediately, withdrawable anytime. Doesn't earn yield.</span>
+          </a>
+          <a href="#topup-stake" className="topup-choice">
+            <span className="topup-tag">Earns yield</span>
+            <strong>Add to stake</strong>
+            <span>Grows your principal and class. Locked again for your class's full term.</span>
+          </a>
+        </div>
+        {/* ── Deposit to yield balance ─────────────────────────────────── */}
+        <div style={CARD} id="topup-balance">
+          <h2 style={{ marginTop: 0 }}>Add to spending balance</h2>
           <p style={HINT}>
-            Top up an active identity's stake. New shares are bought at the current share price, net of pool fees.
-            Cannot add stake to a Dormant identity — use Activate Stake instead.
+            Deposits XNT straight into the identity's yield balance — no waiting for staking rewards. It is spendable
+            right away by your session keys (within their limits) and you can withdraw it anytime from Yield.
+            Anyone can top up an identity: you, a session key, or an app.
+          </p>
+          <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap", marginTop: 12 }}>
+            <label>
+              <span style={LABEL}>Amount (XNT):</span>
+              <input type="number" min={0.001} step={0.001} value={depositXnt}
+                onChange={e => setDepositXnt(parseFloat(e.target.value))}
+                style={{ ...INPUT, width: 100, marginLeft: 4 }} />
+            </label>
+            <button onClick={handleDeposit} style={{ ...BTN_GREEN, marginTop: 0 }}>Add to balance</button>
+          </div>
+          <details style={{ marginTop: 12 }}>
+            <summary style={{ fontSize: 12, color: "var(--muted)", cursor: "pointer" }}>Fund someone else's identity</summary>
+            <p style={{ ...HINT, marginTop: 8 }}>
+              <strong>Check the address:</strong> a deposit belongs to that identity and only its owner can withdraw it.
+            </p>
+            <label>
+              <span style={LABEL}>Vow identity:</span>
+              <input value={depositAddr} onChange={e => setDepositAddr(e.target.value)}
+                placeholder="blank = your identity" style={{ ...INPUT, width: 300, maxWidth: "100%", marginLeft: 4 }} />
+            </label>
+          </details>
+          {depositStatus && <div style={STATUS}>{depositStatus}</div>}
+        </div>
+        {own && !own.activeStake && (
+          <div className="ws-pointer">Your identity is dormant, so stake can't be added. <button onClick={() => setWs("stake")}>Reactivate it in Stake →</button></div>
+        )}
+        {/* ── Add Stake ────────────────────────────────────────────────── */}
+        <div style={CARD} id="topup-stake">
+          <h2 style={{ marginTop: 0 }}>Add to stake</h2>
+          <p style={HINT}>
+            Adds XNT to an active identity's stake. New shares are bought at the current share price, net of pool fees,
+            and your class updates to match the new total.
           </p>
           <div style={{ marginTop: 8, padding: "6px 10px", borderRadius: 4, background: "#fff4e5", color: "#8a4b00", fontSize: 12 }}>
             ⚠ <b>Every top-up re-locks your whole position</b> for the full duration of its class, starting today,
@@ -953,10 +1013,13 @@ export default function App() {
                 onChange={e => setAddStakeXnt(Number(e.target.value))}
                 style={{ ...INPUT, width: 100, marginLeft: 4 }} />
             </label>
-            <button onClick={handleAddStake} style={{ ...BTN_GREEN, marginTop: 0 }}>Add Stake</button>
+            <button onClick={handleAddStake} disabled={!!own && !own.activeStake} style={{ ...BTN, marginTop: 0, opacity: own && !own.activeStake ? 0.45 : 1 }}>Add to stake</button>
           </div>
           {addStakeStatus && <div style={STATUS}>{addStakeStatus}</div>}
         </div>
+              </>)}
+              {ws === "stake" && lastVowState && (<>
+        <div className="ws-pointer">Want to add XNT to your stake? <button onClick={() => setWs("topup")}>Go to Top up →</button></div>
         {/* ── Unstake ──────────────────────────────────────────────────── */}
         <div style={CARD}>
           <h2 style={{ marginTop: 0 }}>Unstake</h2>
@@ -1005,6 +1068,7 @@ export default function App() {
         </div>
               </>)}
               {ws === "yield" && lastVowState && (<>
+        <div className="ws-pointer">Want to add XNT to your spending balance directly? <button onClick={() => setWs("topup")}>Go to Top up →</button></div>
         {/* ── Harvest / Withdraw ───────────────────────────────────────── */}
         <div style={CARD}>
           <h2 style={{ marginTop: 0 }}>Harvest & Withdraw Yield</h2>
@@ -1030,30 +1094,6 @@ export default function App() {
           </div>
           {withdrawStatus && <div style={STATUS}>{withdrawStatus}</div>}
 
-          <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #eee" }}>
-            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>Top Up Yield Balance</div>
-            <p style={{ ...HINT, marginTop: 0 }}>
-              Deposit XNT directly into your yield_balance — no waiting for staking rewards.
-              Anyone can top up an identity (the user, a session key, a dApp). The deposited amount
-              is immediately spendable via session keys, subject to session limits.
-              <strong> Check the address:</strong> a deposit belongs to that identity and only its owner can withdraw it.
-            </p>
-            <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
-              <label>
-                <span style={LABEL}>Vow identity:</span>
-                <input value={depositAddr} onChange={e => setDepositAddr(e.target.value)}
-                  placeholder="Identity to fund" style={{ ...INPUT, width: 280, marginLeft: 4 }} />
-              </label>
-              <label>
-                <span style={LABEL}>Amount (XNT):</span>
-                <input type="number" min={0.001} step={0.001} value={depositXnt}
-                  onChange={e => setDepositXnt(parseFloat(e.target.value))}
-                  style={{ ...INPUT, width: 100, marginLeft: 4 }} />
-              </label>
-              <button onClick={handleDeposit} style={{ ...BTN, marginTop: 0 }}>Top Up</button>
-            </div>
-          </div>
-          {depositStatus && <div style={STATUS}>{depositStatus}</div>}
         </div>
               </>)}
               {ws === "sessions" && lastVowState && (<>
@@ -1222,20 +1262,34 @@ export default function App() {
                       <span style={{ fontSize: 12, color: "#333" }}>
                         <strong>{portableSession ? "Recoverable Session" : "One-Time Session"}</strong>
                         {portableSession
-                          ? <> — key derived from wallet signature. <span style={{ color: "#666" }}>Restore on any device using your wallet. No backup required. Do not share the session key — it is a hot key bounded only by its on-chain limits. <b>Only sign a "VOW Session Authorization" message on this site:</b> anyone who gets that signature can rebuild the key.</span></>
+                          ? <> — key derived from wallet signature. <span style={{ color: "#666" }}>Restore on any device using your wallet. No backup required. Do not share the session key — it is a hot key bounded only by its on-chain limits.</span></>
                           : <> — random key, shown once. <span style={{ color: "#666" }}>Copy and store the secret securely. Cannot be recovered if lost.</span></>}
                       </span>
                     </label>
+                    {portableSession && (
+                      <div style={{ marginTop: 6, padding: "8px 10px", borderRadius: 4, background: "#fdecec", border: "1px solid #f5c2c2", color: "#8a1c1c", fontSize: 11.5, lineHeight: 1.5 }}>
+                        🛡 <b>Phishing warning:</b> only sign a <b>"VOW Session Authorization"</b> message on <b>{window.location.host}</b>.
+                        Wallets don't check the Domain line, so a fake site can ask for the same signature — and whoever
+                        gets it can rebuild your session key. If you ever signed it elsewhere, revoke your sessions.
+                      </div>
+                    )}
                   </div>
                 )}
               </label>
               <label style={{ display: "block" }}>
-                <div style={LABEL}>Allowed program IDs</div>
-                <div style={HINT}>Comma-separated program addresses. With a list, spends only work when one of those programs
+                <div style={LABEL}>Allowed apps (program IDs)</div>
+                <div style={HINT}>Required by default. Comma-separated program addresses. Spends only work when one of those programs
                   calls Vow itself (CPI) — the session key alone can't send funds anywhere. Use this for AI agents and dApps.</div>
                 <input value={newPrograms} onChange={e => setNewPrograms(e.target.value)}
-                  placeholder="program1, program2, …" style={{ ...INPUT, width: "100%", marginTop: 4 }} />
+                  placeholder="the app's program address" style={{ ...INPUT, width: "100%", marginTop: 4 }} />
                 {newPrograms.trim() === "" && (
+                  <label style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 6, cursor: "pointer" }}>
+                    <input type="checkbox" checked={allowAnyDestination} onChange={e => setAllowAnyDestination(e.target.checked)}
+                      style={{ marginTop: 2, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: "#333" }}><strong>Allow any destination</strong> (not recommended)</span>
+                  </label>
+                )}
+                {newPrograms.trim() === "" && allowAnyDestination && (
                   <div style={{ marginTop: 6, padding: "6px 8px", borderRadius: 4, background: "#fff4e5", color: "#8a4b00", fontSize: 11 }}>
                     ⚠ <b>Unrestricted session:</b> whoever holds this session key can pay <b>any address</b>, up to the
                     daily / lifetime limits below. Only use for keys you fully control — never for an AI agent.
